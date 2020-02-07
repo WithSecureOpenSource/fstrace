@@ -1,0 +1,8 @@
+Name: fstrace
+Description:
+Version: 1.0
+Requires:
+Requires.private: fsdyn, rotatable
+Cflags: -I@prefix@/include
+Libs: -L@prefix@/lib -lfstrace
+Libs.private: -lpthread

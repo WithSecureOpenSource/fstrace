@@ -1,0 +1,27 @@
+Import('env')
+
+if env['ARCH'] in [ 'linux32', 'linux64' ]:
+    rtlib = [ 'rt' ]
+else:
+    rtlib = []
+
+env['CCFLAGS'] += ' -O0'
+
+env['CPPPATH'] = [
+    '../components/fstrace/include'
+]
+
+env['LIBPATH'] = [
+    '../src'
+]
+
+env['LIBS'] = [
+    'fstrace',
+    'pthread',
+    rtlib
+]
+
+env.ParseConfig(env['CONFIG_PARSER'])
+
+env.Program('fstracetest',
+            [ 'fstracetest.c' ])

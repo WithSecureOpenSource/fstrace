@@ -1,0 +1,14 @@
+Import('env')
+import os
+
+env['CPPDEFINES'] = [ 'BUILD=1.0.%d' % int(os.getenv("BUILD_NUMBER", "9999")) ]
+
+# make objects usable for shared libs and PIE
+env['CCFLAGS'] += ' -fPIC'
+
+env['CPPPATH'] = [ '#include' ]
+
+env.ParseConfig(env['CONFIG_PARSER'])
+
+env.StaticLibrary('fstrace',
+                  [ 'fstrace.c' ])

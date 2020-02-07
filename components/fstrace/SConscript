@@ -1,0 +1,17 @@
+Import('env')
+
+import os
+
+include = env.Install('include', ['#include/fstrace.h'])
+lib = env.Install('lib', ['../../src/libfstrace.a'])
+fstracecheck = env.Install('etc', ['#etc/fstracecheck.py'])
+
+env.Alias(
+    'install', env.Install(os.path.join(env['PREFIX'], 'include'), include),
+)
+env.Alias('install', env.Install(os.path.join(env['PREFIX'], 'lib'), lib))
+env.Alias(
+    'install', env.Install(os.path.join(env['PREFIX'], 'bin'), fstracecheck)
+)
+
+env['CONFIG_BUILDER'](env)
