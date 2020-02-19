@@ -303,6 +303,8 @@ const char *fstrace_hex_repr(uint64_t n);
 #ifdef __cplusplus
 }
 
+#if __cplusplus >= 201703L
+
 #include <cassert>
 #include <string>
 #include <type_traits>
@@ -383,6 +385,8 @@ struct TraceIterator {
 
 } // namespace fstrace
 } // namespace fsecure
+
+#endif // #if __cplusplus >= 201703L
 
 #endif
 
