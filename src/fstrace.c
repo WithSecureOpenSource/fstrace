@@ -158,7 +158,9 @@ static fstrace_t *do_open(const char *pathname_prefix, ssize_t rotate_size,
         trace->outf = outf;
     } else {
         trace->rotatable =
-            make_rotatable(pathname_prefix, ".log", rotate_size, trace->params);
+            make_rotatable(pathname_prefix, ".log", rotate_size,
+                           trace->params);
+        rotatable_set_mode(trace->rotatable, 0600);
         struct timeval tv;
         gettimeofday(&tv, NULL);
         time_t t = tv.tv_sec;
