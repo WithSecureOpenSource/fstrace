@@ -15,6 +15,7 @@
 #include <netinet/in.h>
 #include <sys/un.h>
 #include <regex.h>
+#include <fsdyn/charstr.h>
 #include <fsdyn/date.h>
 #include <fsdyn/fsalloc.h>
 #include "fstrace.h"
@@ -310,41 +311,6 @@ static void process_bool(fstrace_t *trace, va_list *pap)
     fputs(va_arg(*pap, int) ? "true" : "false", trace->outf);
 }
 
-static char url_encode_table[256] = {
-    '%', '%', '%', '%', '%', '%', '%', '%',
-    '%', '%', '%', '%', '%', '%', '%', '%',
-    '%', '%', '%', '%', '%', '%', '%', '%',
-    '%', '%', '%', '%', '%', '%', '%', '%',
-    '+', '%', '"', '%', '%', '%', '%', '%',
-    '%', '%', '%', '%', '%', '-', '.', '/',
-    '0', '1', '2', '3', '4', '5', '6', '7',
-    '8', '9', '%', '%', '<', '%', '>', '%',
-    '%', 'A', 'B', 'C', 'D', 'E', 'F', 'G',
-    'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
-    'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W',
-    'X', 'Y', 'Z', '%', '\\', '%', '^', '_',
-    '`', 'a', 'b', 'c', 'd', 'e', 'f', 'g',
-    'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
-    'p', 'q', 'r', 's', 't', 'u', 'v', 'w',
-    'x', 'y', 'z', '{', '|', '}', '~', '%',
-    '%', '%', '%', '%', '%', '%', '%', '%',
-    '%', '%', '%', '%', '%', '%', '%', '%',
-    '%', '%', '%', '%', '%', '%', '%', '%',
-    '%', '%', '%', '%', '%', '%', '%', '%',
-    '%', '%', '%', '%', '%', '%', '%', '%',
-    '%', '%', '%', '%', '%', '%', '%', '%',
-    '%', '%', '%', '%', '%', '%', '%', '%',
-    '%', '%', '%', '%', '%', '%', '%', '%',
-    '%', '%', '%', '%', '%', '%', '%', '%',
-    '%', '%', '%', '%', '%', '%', '%', '%',
-    '%', '%', '%', '%', '%', '%', '%', '%',
-    '%', '%', '%', '%', '%', '%', '%', '%',
-    '%', '%', '%', '%', '%', '%', '%', '%',
-    '%', '%', '%', '%', '%', '%', '%', '%',
-    '%', '%', '%', '%', '%', '%', '%', '%',
-    '%', '%', '%', '%', '%', '%', '%', '%'
-};
-
 static void emit_byte_verbatim(FILE *outf, uint8_t byte)
 {
     fputc(byte, outf);
@@ -352,10 +318,7 @@ static void emit_byte_verbatim(FILE *outf, uint8_t byte)
 
 static void emit_byte(FILE *outf, uint8_t byte)
 {
-    char c = url_encode_table[byte];
-    if (c == '%')
-        fprintf(outf, "%%%02x", byte);
-    else fputc(c, outf);
+    fputs(charstr_url_encode_byte(byte), outf);
 }
 
 static void emit_string(FILE *outf, const char *begin, const char *end)
@@ -751,14 +714,6 @@ static void process_address(fstrace_t *trace, va_list *pap)
     emit_unknown_address(trace->outf, addr, addrlen);
 }
 
-const char *skip(const char *s, const char *prefix)
-{
-    while (*prefix)
-        if (*s++ != *prefix++)
-            return NULL;
-    return s;
-}
-
 static struct field_descr {
     const char *directive;
     void (*processor)(fstrace_t *trace, va_list *pap);
@@ -795,7 +750,7 @@ static struct field_descr *identify_field(const char *format,
 {
     struct field_descr *descr;
     for (descr = fields; descr->directive; descr++) {
-        const char *q = skip(format, descr->directive);
+        const char *q = charstr_skip_prefix(format, descr->directive);
         if (q) {
             *next = q;
             return descr;
