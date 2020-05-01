@@ -9,6 +9,7 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <fsdyn/charstr.h>
 #include <fsdyn/fsalloc.h>
 #include <fstrace.h>
 #include "fstracetest.h"
@@ -90,7 +91,7 @@ static void verify(const char *name, VERDICT (*testcase)(void))
 
 #define VERIFY(tc) verify(#tc, tc)
 
-static char prefix[10000];
+static char *prefix;
 
 static int enable_all(void *data, const char *id)
 {
@@ -193,24 +194,22 @@ VERDICT test_fstrace_robustness(void)
 
 int main(int argc, char *const argv[])
 {
+    char *lock_path = charstr_printf("%s/lock", argv[1]);
+    fstrace_set_lock_path(lock_path);
+    fsfree(lock_path);
+    char *log_path = charstr_printf("%s/log", argv[1]);
+    mkdir(log_path, 0777);
+    struct stat statbuf;
+    stat(log_path, &statbuf);
+    assert(S_ISDIR(statbuf.st_mode));
+    prefix = charstr_printf("%s/trace", log_path);
+    fsfree(log_path);
     reallocator = fs_get_reallocator();
     fs_set_reallocator(test_realloc);
-    strcpy(prefix, argv[0]);
-    char *slash = strrchr(prefix, '/');
-    if (slash == NULL)
-        slash = prefix;
-    else slash++;
-    strcpy(slash, "lock");
-    fstrace_set_lock_path(prefix);
-    strcpy(slash, "../log");
-    mkdir(prefix, 0777);
-    struct stat statbuf;
-    stat(prefix, &statbuf);
-    assert(S_ISDIR(statbuf.st_mode));
-    strcat(slash, "/trace");
     VERIFY(test_fstrace_perf);
     VERIFY(test_fstrace_basic);
     VERIFY(test_fstrace_iterated);
     VERIFY(test_fstrace_robustness);
+    fsfree(prefix);
     return failures;
 }
