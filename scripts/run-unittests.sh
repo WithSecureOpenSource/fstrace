@@ -49,7 +49,7 @@ run-tests () {
     FSCCFLAGS="-fprofile-arcs -ftest-coverage -O0" \
     FSLINKFLAGS="-fprofile-arcs" \
         ${SCONS:-scons} builddir=test &&
-    stage/$arch/test/test/fstracetest &&
+    stage/$arch/test/test/fstracetest stage/$arch/test &&
     test-coverage $arch
 }
 
