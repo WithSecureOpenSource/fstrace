@@ -115,6 +115,10 @@ void fstrace_set_lock_path(const char *pathname)
                 FSTRACE_FAIL();
             else if (fchown(THE_MUTEX, THE_USER_ID, THE_GROUP_ID) < 0)
                 FSTRACE_FAIL();
+            /* No O_CLOEXEC in CentOS 5 */
+            int flags = fcntl(THE_MUTEX, F_GETFL, 0);
+            if (flags != -1)
+                (void) fcntl(THE_MUTEX, F_SETFL, flags | FD_CLOEXEC);
             break;
         case FSTRACE_STATE_INITIALIZED:
             assert(false);
