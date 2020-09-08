@@ -107,9 +107,9 @@ static void *shared_alloc(fstrace_t *trace, size_t size)
 static int set_cloexec(int fd)
 {
     if (fd >= 0) {
-        int flags = fcntl(fd, F_GETFL, 0);
+        int flags = fcntl(fd, F_GETFD, 0);
         if (flags != -1)
-            (void) fcntl(fd, F_SETFL, flags | FD_CLOEXEC);
+            (void) fcntl(fd, F_SETFD, flags | FD_CLOEXEC);
     }
     return fd;
 }
