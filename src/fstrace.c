@@ -180,6 +180,7 @@ static fstrace_t *do_open(const char *pathname_prefix, ssize_t rotate_size,
         epoch_to_utc(t, &tm);
         (void) rotatable_rename(trace->rotatable, &tm, tv.tv_usec);
     }
+    trace->common_fields = NULL;
     return trace;
 }
 
@@ -193,26 +194,29 @@ fstrace_t *fstrace_direct(FILE *outf)
     return do_open("", -1, outf);
 }
 
+static void flush_fields(list_t *fields)
+{
+    if (!fields)
+        return;
+    while (!list_empty(fields)) {
+        struct fstrace_field *f = (struct fstrace_field *)
+            list_pop_first(fields);
+        fsfree(f->leader);
+        fsfree(f);
+    }
+    destroy_list(fields);
+}
+
 int fstrace_close(fstrace_t *trace)
 {
+    flush_fields(trace->common_fields);
     if (trace->rotatable)
         destroy_rotatable(trace->rotatable);
-    list_elem_t *elem;
-    for (elem = list_get_first(trace->events);
-         elem != NULL;
-         elem = list_next(elem)) {
-        struct fstrace_event_impl *ev_imp = (void *) list_elem_get_value(elem);
-        list_elem_t *elf;
-        for (elf = list_get_first(ev_imp->fields);
-             elf != NULL;
-             elf = list_next(elf)) {
-            struct fstrace_field *field = (void *) list_elem_get_value(elf);
-            fsfree(field->leader);
-            fsfree(field);
-        }
-        destroy_list(ev_imp->fields);
+    while (!list_empty(trace->events)) {
+        struct fstrace_event_impl *ev_imp =
+            (struct fstrace_event_impl *) list_pop_first(trace->events);
+        flush_fields(ev_imp->fields);
         free(ev_imp->id);
-        fsfree(ev_imp->trailer);
         fsfree(ev_imp);
     }
     destroy_list(trace->events);
@@ -268,6 +272,16 @@ static void unlock(fstrace_t *trace)
     }
     if (pthread_sigmask(SIG_SETMASK, &trace->old_mask, NULL) < 0)
         FSTRACE_FAIL();
+}
+
+static void separate_fields(fstrace_t *trace, va_list *pap)
+{
+    fputc(' ', trace->outf);
+}
+
+static void terminate_event(fstrace_t *trace, va_list *pap)
+{
+    fputc('\n', trace->outf);
 }
 
 static void process_percent(fstrace_t *trace, va_list *pap)
@@ -756,6 +770,19 @@ static struct field_descr {
     { NULL, }
 };
 
+/* processors that don't consume the stack */
+static void (*global_processors[])(fstrace_t *trace, va_list *pap) = {
+    separate_fields,
+    terminate_event,
+    process_percent,
+    process_pid,
+    process_tid,
+    process_file,
+    process_line,
+    process_errno,
+    NULL
+};
+
 static struct field_descr *identify_field(const char *format,
                                           const char **next)
 {
@@ -770,7 +797,18 @@ static struct field_descr *identify_field(const char *format,
     return NULL;
 }
 
-static int parse_format(struct fstrace_event_impl *ev_imp, const char *format)
+static struct fstrace_field *
+make_field(char *leader,
+           void (*processor)(fstrace_t *trace, va_list *pap))
+{
+    struct fstrace_field *field = fsalloc(sizeof *field);
+    field->leader = leader;
+    field->processor = processor;
+    return field;
+}
+
+static bool parse_format(list_t *fields, const char *format,
+                         void (*terminator)(fstrace_t *trace, va_list *pap))
 {
     const char *p = format;
     for (;;) {
@@ -782,19 +820,16 @@ static int parse_format(struct fstrace_event_impl *ev_imp, const char *format)
         memcpy(snippet, p, snippet_size);
         snippet[snippet_size] = '\0';
         if (*q != '%') {
-            ev_imp->trailer = snippet;
-            return 1;
+            list_append(fields, make_field(snippet, terminator));
+            return true;
         }
         const char *r;
         struct field_descr *descr = identify_field(q, &r);
         if (descr == NULL) {
-            ev_imp->trailer = snippet;
-            return 0;
+            list_append(fields, make_field(snippet, terminator));
+            return false;
         }
-        struct fstrace_field *field = fsalloc(sizeof *field);
-        field->leader = snippet;
-        field->processor = descr->processor;
-        list_append(ev_imp->fields, field);
+        list_append(fields, make_field(snippet, descr->processor));
         p = r;
     }
 }
@@ -814,13 +849,39 @@ fstrace_event_t *fstrace_declare(fstrace_t *trace, const char *id,
     ev_imp->shared = event;
     list_append(trace->events, ev_imp);
     unlock(trace);
-    if (!parse_format(ev_imp, format)) {
+    if (!parse_format(ev_imp->fields, format, terminate_event)) {
         /* Leave the bad object allocated. It is permanently disabled
          * and will get cleaned with fstrace_close(). Or more to the
          * point, the programmer will fix the bug. */
         return NULL;
     }
     return event;
+}
+
+static bool is_global_processor(void (*p)(fstrace_t *trace, va_list *pap))
+{
+    int i;
+    for (i = 0; global_processors[i]; i++)
+        if (p == global_processors[i])
+            return true;
+    return false;
+}
+
+void fstrace_common(fstrace_t *trace, const char *format)
+{
+    if (!lock(trace))
+        return;
+    flush_fields(trace->common_fields);
+    trace->common_fields = make_list();
+    if (!parse_format(trace->common_fields, format, separate_fields))
+        flush_fields(trace->common_fields);
+    list_elem_t *e;
+    for (e = list_get_first(trace->common_fields); e; e = list_next(e)) {
+        struct fstrace_field *f = (struct fstrace_field *)
+            list_elem_get_value(e);
+        assert(is_global_processor(f->processor));
+    }
+    unlock(trace);
 }
 
 static bool emit_timestamp(fstrace_t *trace)
@@ -862,6 +923,15 @@ static void __fstrace_log(fstrace_event_t *event,
     trace->err = err;
     fprintf(trace->outf, "%s ", ev_imp->id);
     list_elem_t *elem;
+    if (trace->common_fields) {
+        for (elem = list_get_first(trace->common_fields);
+             elem != NULL;
+             elem = list_next(elem)) {
+            struct fstrace_field *field = (void *) list_elem_get_value(elem);
+            fprintf(trace->outf, "%s", field->leader);
+            field->processor(trace, pap);
+        }
+    }
     for (elem = list_get_first(ev_imp->fields);
          elem != NULL;
          elem = list_next(elem)) {
@@ -869,7 +939,6 @@ static void __fstrace_log(fstrace_event_t *event,
         fprintf(trace->outf, "%s", field->leader);
         field->processor(trace, pap);
     }
-    fprintf(trace->outf, "%s\n", ev_imp->trailer);
     fflush(trace->outf);
 }
 
