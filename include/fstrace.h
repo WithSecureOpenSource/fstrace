@@ -103,7 +103,7 @@ fstrace_event_t *fstrace_declare(fstrace_t *trace, const char *id,
  * arguments. For example, "TID=%T" causes the current thread ID to be
  * inserted after the event id properly surrounded by whitespace.
  */
-void fstrace_common(fstrace_t *trace, const char *format);
+void fstrace_set_common_format(fstrace_t *trace, const char *format);
 
 /*
  * Sets errno and returns a negative number in case of error. Don't call

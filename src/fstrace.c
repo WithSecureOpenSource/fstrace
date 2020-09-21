@@ -867,7 +867,7 @@ static bool is_global_processor(void (*p)(fstrace_t *trace, va_list *pap))
     return false;
 }
 
-void fstrace_common(fstrace_t *trace, const char *format)
+void fstrace_set_common_format(fstrace_t *trace, const char *format)
 {
     if (!lock(trace))
         return;
