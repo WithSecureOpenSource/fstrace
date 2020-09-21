@@ -873,13 +873,17 @@ void fstrace_set_common_format(fstrace_t *trace, const char *format)
         return;
     flush_fields(trace->common_fields);
     trace->common_fields = make_list();
-    if (!parse_format(trace->common_fields, format, separate_fields))
+    if (!format || !*format ||
+        !parse_format(trace->common_fields, format, separate_fields)) {
         flush_fields(trace->common_fields);
-    list_elem_t *e;
-    for (e = list_get_first(trace->common_fields); e; e = list_next(e)) {
-        struct fstrace_field *f = (struct fstrace_field *)
-            list_elem_get_value(e);
-        assert(is_global_processor(f->processor));
+        trace->common_fields = NULL;
+    } else {
+        list_elem_t *e;
+        for (e = list_get_first(trace->common_fields); e; e = list_next(e)) {
+            struct fstrace_field *f = (struct fstrace_field *)
+                list_elem_get_value(e);
+            assert(is_global_processor(f->processor));
+        }
     }
     unlock(trace);
 }
