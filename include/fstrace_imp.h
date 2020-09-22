@@ -39,6 +39,7 @@ struct fstrace {
     const char *file;           /* source file; valid during logging */
     unsigned lineno;            /* line number; valid during logging */
     int err;                    /* errno; valid during logging */
+    list_t *common_fields;      /* of struct fstrace_field */
 };
 
 struct fstrace_field {
@@ -51,5 +52,4 @@ struct fstrace_event_impl {
     fstrace_event_t *shared;
     char *id;
     list_t *fields;             /* of struct fstrace_field */
-    char *trailer;              /* includes the terminating LF */
 };

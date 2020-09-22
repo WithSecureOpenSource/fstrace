@@ -98,6 +98,14 @@ fstrace_event_t *fstrace_declare(fstrace_t *trace, const char *id,
                                  const char *format);
 
 /*
+ * Add a format string that is prepended to every trace event. The
+ * format directives in the format string must not expect any
+ * arguments. For example, "TID=%T" causes the current thread ID to be
+ * inserted after the event id properly surrounded by whitespace.
+ */
+void fstrace_set_common_format(fstrace_t *trace, const char *format);
+
+/*
  * Sets errno and returns a negative number in case of error. Don't call
  * fstrace_log...() directly. Instead, use the FSTRACE_... macros below.
  */

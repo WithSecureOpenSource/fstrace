@@ -106,6 +106,7 @@ static int disable_all(void *data, const char *id)
 VERDICT test_fstrace_basic(void)
 {
     fstrace_t *trace = fstrace_open(prefix, 10);
+    fstrace_set_common_format(trace, "P=%P");
     fstrace_event_t *TEST_BASIC =
         fstrace_declare(trace, "TEST-BASIC", "A=%d B=%s");
     FSTRACE(TEST_BASIC, 7, "hello world");
