@@ -28,7 +28,7 @@ TARGET_DEFINES = {
 TARGET_FLAGS = {
     'linux32': '-m32 ',
     'linux64': '',
-    'darwin': ''
+    'darwin': '-mmacosx-version-min=10.13 '
 }
 
 def libconfig_builder(env):
