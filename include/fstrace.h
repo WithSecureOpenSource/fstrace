@@ -14,7 +14,6 @@ extern "C" {
 #endif
 
 typedef struct fstrace fstrace_t;
-typedef struct fstrace_symbol fstrace_symbol_t;
 typedef struct {
     struct fstrace_event_impl *impl;
     volatile int enabled;
