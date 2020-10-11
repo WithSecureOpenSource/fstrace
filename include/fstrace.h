@@ -141,7 +141,7 @@ static inline bool FSTRACE_ENABLED(fstrace_event_t *event)
 #define FSTRACE(event, ...)                                             \
     do {                                                                \
         if (FSTRACE_ENABLED(event))                                     \
-            fstrace_log(event, __FILE__, __LINE__, __VA_ARGS__);        \
+            fstrace_log_2(event, __FILE__, __LINE__, __VA_ARGS__);      \
     } while (0)
 #endif
 
