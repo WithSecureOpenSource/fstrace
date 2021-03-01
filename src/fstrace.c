@@ -375,7 +375,8 @@ static void process_indirect_string(fstrace_t *trace, va_list *pap)
 {
     const char *(*func)(void *) = va_arg(*pap, const char *(*)(void *));
     void *arg = va_arg(*pap, void *);
-    emit_string(trace->outf, func(arg), NULL);
+    const char *begin = arg ? func(arg) : NULL;
+    emit_string(trace->outf, begin, NULL);
 }
 
 static void process_iteration(fstrace_t *trace, va_list *pap)
