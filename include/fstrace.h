@@ -68,13 +68,16 @@ int fstrace_close(fstrace_t *trace);
  * %z    An ssize_t (or size_t) argument.
  * %f    A double argument.
  * %b    A boolean (or int) argument.
- * %s    A NUL-terminated string argument.
+ * %s    A NUL-terminated string argument. A null pointer argument is
+ *       allowed and mapped onto the empty string.
  * %S    A NUL-terminated string argument with size limit.
  *       Two arguments: <const char *, size_t>.
  * %I    Indirect string. Two arguments: <const char *(*f)(void *), void *>.
  *       Handy for mapping enumerated values. As tracing calls are
  *       made inside critical sections, the function may also return a
- *       pointer to a static buffer.
+ *       pointer to a static buffer. A null pointer second argument is
+ *       allowed and mapped onto the empty string, without invoking the
+ *       trace function.
  * %J    Iterated indirect string. Two arguments:
  *       <const char *(*f)(void *), void *>. The function is called
  *       repeatedly until it returns NULL, and all returned strings
