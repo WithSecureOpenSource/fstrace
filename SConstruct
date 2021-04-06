@@ -10,24 +10,32 @@ def target_architectures():
     if archs:
         return archs.split(',')
 
+    arch_map = {
+        ('Darwin', 'arm64'): ['darwin'],
+        ('Darwin', 'x86_64'): ['darwin'],
+        ('FreeBSD', 'amd64'): ['freebsd_amd64'],
+        ('Linux', 'i686'): ['linux32'],
+        ('Linux', 'x86_64'): ['linux64'],
+        ('OpenBSD', 'amd64'): ['openbsd_amd64'],
+    }
+
     uname_os, _, _, _, uname_cpu = os.uname()
-    if uname_os == 'Linux':
-        if uname_cpu == 'x86_64':
-            return ['linux64']
-        assert uname_cpu == 'i686'
-        return ['linux32']
-    assert uname_os == 'Darwin'
-    return ['darwin']
+    assert (uname_os, uname_cpu) in arch_map
+    return arch_map[(uname_os, uname_cpu)]
 
 TARGET_DEFINES = {
+    'freebsd_amd64': [],
     'linux32': ['_FILE_OFFSET_BITS=64'],
     'linux64': [],
+    'openbsd_amd64': [],
     'darwin': []
 }
 
 TARGET_FLAGS = {
+    'freebsd_amd64': '',
     'linux32': '-m32 ',
     'linux64': '',
+    'openbsd_amd64': '',
     'darwin': '-mmacosx-version-min=10.13 '
 }
 

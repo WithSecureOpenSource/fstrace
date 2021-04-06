@@ -254,12 +254,16 @@ def printf32_common(directive):
 
 printf64 = {
     "Darwin": printf32_common,  # sic!
+    "FreeBSD": printf32_common,
     "Linux": printf64_linux,
+    "OpenBSD": printf32_common,
 }
 
 printf32 = {
     "Darwin": printf32_common,
+    "FreeBSD": printf32_common,
     "Linux": printf32_common,
+    "OpenBSD": printf32_common,
 }
 
 

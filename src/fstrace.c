@@ -14,6 +14,7 @@
 #include <errno.h>
 #include <sys/time.h>
 #include <netinet/in.h>
+#include <sys/socket.h>
 #include <sys/un.h>
 #include <regex.h>
 #include <fsdyn/charstr.h>
@@ -82,7 +83,7 @@ static fstrace_memblock_t *replenish_mempool(fstrace_t *trace)
 {
     fstrace_memblock_t *block = fsalloc(sizeof *block);
     block->start = mmap(NULL, BLOCK_SIZE, PROT_READ | PROT_WRITE,
-                        MAP_ANON | MAP_SHARED, 0, 0);
+                        MAP_ANON | MAP_SHARED, -1, 0);
     assert(block->start != NULL); 
     block->free = block->start;
     list_append(trace->mempool, block);
@@ -478,25 +479,35 @@ static const char *errid(int err)
         case EMFILE:          return "EMFILE";
         case EMLINK:          return "EMLINK";
         case EMSGSIZE:        return "EMSGSIZE";
+#ifdef EMULTIHOP
         case EMULTIHOP:       return "EMULTIHOP";
+#endif
         case ENAMETOOLONG:    return "ENAMETOOLONG";
         case ENETDOWN:        return "ENETDOWN";
         case ENETRESET:       return "ENETRESET";
         case ENETUNREACH:     return "ENETUNREACH";
         case ENFILE:          return "ENFILE";
         case ENOBUFS:         return "ENOBUFS";
+#ifdef ENODATA
         case ENODATA:         return "ENODATA";
+#endif
         case ENODEV:          return "ENODEV";
         case ENOENT:          return "ENOENT";
         case ENOEXEC:         return "ENOEXEC";
         case ENOLCK:          return "ENOLCK";
+#ifdef ENOLINK
         case ENOLINK:         return "ENOLINK";
+#endif
         case ENOMEM:          return "ENOMEM";
         case ENOMSG:          return "ENOMSG";
         case ENOPROTOOPT:     return "ENOPROTOOPT";
         case ENOSPC:          return "ENOSPC";
+#ifdef ENOSR
         case ENOSR:           return "ENOSR";
+#endif
+#ifdef ENOSTR
         case ENOSTR:          return "ENOSTR";
+#endif
         case ENOSYS:          return "ENOSYS";
         case ENOTBLK:         return "ENOTBLK";
         case ENOTCONN:        return "ENOTCONN";
@@ -523,7 +534,9 @@ static const char *errid(int err)
         case ESPIPE:          return "ESPIPE";
         case ESRCH:           return "ESRCH";
         case ESTALE:          return "ESTALE";
+#ifdef ETIME
         case ETIME:           return "ETIME";
+#endif
         case ETIMEDOUT:       return "ETIMEDOUT";
         case ETOOMANYREFS:    return "ETOOMANYREFS";
         case ETXTBSY:         return "ETXTBSY";
