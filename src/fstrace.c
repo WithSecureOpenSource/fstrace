@@ -580,7 +580,6 @@ static const char *errid(int err)
         case EAUTH:           return "EAUTH";
         case EBADRPC:         return "EBADRPC";
         case EFTYPE:          return "EFTYPE";
-        case ELAST:           return "ELAST";
         case ENEEDAUTH:       return "ENEEDAUTH";
         case ENOATTR:         return "ENOATTR";
         case EPROCLIM:        return "EPROCLIM";
