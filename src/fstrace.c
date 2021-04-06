@@ -578,23 +578,25 @@ static const char *errid(int err)
         case EXFULL:          return "EXFULL";
 #else
         case EAUTH:           return "EAUTH";
-        case EBADARCH:        return "EBADARCH";
-        case EBADEXEC:        return "EBADEXEC";
-        case EBADMACHO:       return "EBADMACHO";
         case EBADRPC:         return "EBADRPC";
-        case EDEVERR:         return "EDEVERR";
         case EFTYPE:          return "EFTYPE";
         case ELAST:           return "ELAST";
         case ENEEDAUTH:       return "ENEEDAUTH";
         case ENOATTR:         return "ENOATTR";
-        case ENOPOLICY:       return "ENOPOLICY";
         case EPROCLIM:        return "EPROCLIM";
         case EPROCUNAVAIL:    return "EPROCUNAVAIL";
         case EPROGMISMATCH:   return "EPROGMISMATCH";
         case EPROGUNAVAIL:    return "EPROGUNAVAIL";
-        case EPWROFF:         return "EPWROFF";
         case ERPCMISMATCH:    return "ERPCMISMATCH";
+#ifdef __APPLE__
+        case EBADARCH:        return "EBADARCH";
+        case EBADEXEC:        return "EBADEXEC";
+        case EBADMACHO:       return "EBADMACHO";
+        case EDEVERR:         return "EDEVERR";
+        case ENOPOLICY:       return "ENOPOLICY";
+        case EPWROFF:         return "EPWROFF";
         case ESHLIBVERS:      return "ESHLIBVERS";
+#endif
 #endif
         default: return NULL;
     }
