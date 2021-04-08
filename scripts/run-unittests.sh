@@ -32,7 +32,7 @@ realpath () {
         /bin/realpath "$@"
     else
         # reimplementation of "readlink -fv" for OSX
-        python -c "import os.path, sys; print os.path.realpath(sys.argv[1])" \
+        python -c "import os.path, sys; print(os.path.realpath(sys.argv[1]))" \
                "$1"
     fi
 }
