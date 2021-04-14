@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdatomic.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/file.h>
@@ -38,6 +39,14 @@ static pthread_mutex_t the_mutex =
 static char lock_path[1000] = "/tmp/fstrace.lock.XXXXXX";
 static uid_t THE_USER_ID;
 static gid_t THE_GROUP_ID;
+static uint64_t pid_infix;   /* derived from getpid() */
+static atomic_uint_fast64_t next_unique_id;
+
+static void update_pid_infix()
+{
+    /* A round number that often looks nice in trace output */
+    pid_infix = getpid() * (uint64_t) 1000000;
+}
 
 static void __attribute__((constructor)) unique_constructor(void)
 {
@@ -46,6 +55,8 @@ static void __attribute__((constructor)) unique_constructor(void)
     sigdelset(&SIG_MASK, SIGBUS);
     THE_USER_ID = geteuid();
     THE_GROUP_ID = getegid();
+    update_pid_infix();
+    atomic_init(&next_unique_id, 0);
 }
 
 static void __attribute__((destructor)) unique_destructor(void)
@@ -63,19 +74,8 @@ unsigned FSTRACE_FAILURE_LINE;  /* for the debugger */
 
 uint64_t fstrace_get_unique_id()
 {
-    sigset_t old_mask;
-    int status = pthread_sigmask(SIG_BLOCK, &SIG_MASK, &old_mask);
-    assert(status >= 0);
-    int err = pthread_mutex_lock(&the_mutex);
-    assert(err == 0);
-    static uint64_t next_id;
-    uint64_t raw_id = next_id++;
-    err = pthread_mutex_unlock(&the_mutex);
-    assert(err == 0);
-    status = pthread_sigmask(SIG_SETMASK, &old_mask, NULL);
-    assert(status >= 0);
-    return (unsigned long) getpid() * 1000000 +
-        (raw_id & 0x3ffff) + (raw_id & ~0x3ffff) * 1410065407;
+    uint64_t raw_id = atomic_fetch_add(&next_unique_id, 1);
+    return pid_infix + (raw_id & 0x3ffff) + (raw_id & ~0x3ffff) * 1410065407;
 }
 
 static fstrace_memblock_t *replenish_mempool(fstrace_t *trace)
@@ -1066,6 +1066,7 @@ int fstrace_chown(uid_t owner, gid_t group)
 
 int fstrace_reinit()
 {
+    update_pid_infix();
     if (fstrace_state != FSTRACE_STATE_INITIALIZED)
         return 0;
     close(THE_MUTEX);
