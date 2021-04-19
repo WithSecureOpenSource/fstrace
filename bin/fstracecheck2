@@ -308,6 +308,11 @@ def form_cccmd(argv, dirpath, pathname, pp_output):
 
 def in_parallel(jobs, to_do, func, env):
     q = queue.Queue()
+    if jobs is None or jobs <= 1:
+        for args in to_do:
+            func(q, args, env)
+            yield q.get()
+        return
     in_flight = 0
     for args in to_do:
         if in_flight < jobs:
