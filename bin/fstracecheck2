@@ -156,16 +156,25 @@ def form_tstcmd(argv, dirpath, pathname, test_source):
     yield "-Wno-unused-command-line-argument"
 
 
+class PreprocessingFailure(Exception):
+    pass
+
+
 def preprocess_all(sources, jobs):
     decl = []
     files = []
-    for dirpath, pathname, x_output, pp_output, argv in in_parallel(
-        jobs, sources, preprocess, None
-    ):
+    ok = True
+    for result in in_parallel(jobs, sources, preprocess, None):
+        if result is None:
+            ok = False
+            continue
+        dirpath, pathname, x_output, pp_output, argv = result
         if x_output is not None:
             files.append((dirpath, pathname, x_output, pp_output, argv))
             for d in declarations(x_output):
                 decl.append(d)
+    if not ok:
+        raise PreprocessingFailure()
     return decl, files
 
 
@@ -225,6 +234,7 @@ def transform_all(decl, files, type_info, jobs):
     }
     return all(
         # list() to prevent short-circuiting
+        # in_parallel() yields True, False or None
         list(in_parallel(jobs, files, transform_and_check, translations))
     )
 
@@ -304,9 +314,17 @@ def in_parallel(jobs, to_do, func, env):
             in_flight += 1
         else:
             yield q.get()
-        _thread.start_new_thread(func, (q, args, env))
+        _thread.start_new_thread(parallel_wrapper, (func, q, args, env))
     for _ in range(in_flight):
         yield q.get()
+
+
+def parallel_wrapper(func, q, args, env):
+    try:
+        func(q, args, env)
+    except:
+        q.put(None)
+        raise
 
 
 if __name__ == "__main__":
