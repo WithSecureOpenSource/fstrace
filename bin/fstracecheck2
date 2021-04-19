@@ -63,7 +63,8 @@ def main():
         dirpath, pathname, ext, _, argv = sources[0]
         type_info = learn_types(dirpath, pathname, ext, argv)
         decl, files = preprocess_all(sources)
-        transform_all(decl, files, type_info)
+        if not transform_all(decl, files, type_info):
+            sys.exit(1)
     finally:
         shutil.rmtree(workpath)
 
@@ -226,6 +227,7 @@ def transform_all(decl, files, type_info):
         transform(x_output, pp_output, translations)
         if not check(dirpath, pathname, pp_output, argv):
             passed = False
+    return passed
 
 
 def declarations(pathname):
