@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import os, sys, re, argparse, subprocess, shutil, json, shlex
+import os, sys, re, argparse, subprocess, tempfile, json, shlex
 
 DECL_PTN1 = re.compile(
     r"\bTRC\s*\.\s*(?P<entry>\w+)\s*=\s*fstrace_declare\s*\(\s*\w+\s*,"
@@ -55,9 +55,7 @@ def main():
     args = parser.parse_args()
     with open(args.compdb) as dbf:
         db = json.load(dbf)
-    workpath = os.path.join("/tmp/fstracecheck.%s" % os.getpid())
-    os.mkdir(workpath)
-    try:
+    with tempfile.TemporaryDirectory(prefix="fstracecheck") as workpath:
         os.chdir(workpath)
         sources = list(get_sources(db))
         dirpath, pathname, ext, _, argv = sources[0]
@@ -65,8 +63,6 @@ def main():
         decl, files = preprocess_all(sources)
         if not transform_all(decl, files, type_info):
             sys.exit(1)
-    finally:
-        shutil.rmtree(workpath)
 
 
 def get_sources(db):
