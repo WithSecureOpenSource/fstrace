@@ -1,0 +1,291 @@
+#!/usr/bin/env python
+
+import os, sys, re, argparse, subprocess, shutil, json, shlex
+
+DECL_PTN1 = re.compile(
+    r"\bTRC\s*\.\s*(?P<entry>\w+)\s*=\s*fstrace_declare\s*\(\s*\w+\s*,"
+    r'\s*"[^"]*"\s*,'
+    r'(?P<descr>(\s*"[^"]*")+)'
+    r"\s*\)"
+)
+
+DECL_PTN2 = re.compile(
+    r"fstrace_specify\(&spec, &(?P<entry>\w+), name, "
+    r'(?P<descr>(\s*"[^"]*")+)'
+    r"\s*\)"
+)
+
+DESCR_PTN = re.compile(
+    "|".join(
+        [
+            "%%",
+            "%T",
+            "%F",
+            "%L",
+            "%P",
+            "%b",
+            "%J",
+            "%d",
+            "%u",
+            "%x",
+            "%64d",
+            "%64u",
+            "%64x",
+            "%z",
+            "%f",
+            "%s",
+            "%S",
+            "%I",
+            "%A",
+            "%B",
+            "%e",
+            "%E",
+            "%p",
+            "%a",
+        ]
+    )
+)
+
+LOG_PTN = re.compile(r"\bfstrace_log_2\s*\(\s*(TRC\s*.\s*)?(?P<entry>\w+)\b")
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("compdb")
+    args = parser.parse_args()
+    with open(args.compdb) as dbf:
+        db = json.load(dbf)
+    workpath = os.path.join("/tmp/fstracecheck.%s" % os.getpid())
+    os.mkdir(workpath)
+    try:
+        os.chdir(workpath)
+        sources = list(get_sources(db))
+        dirpath, pathname, ext, _, argv = sources[0]
+        type_info = learn_types(dirpath, pathname, ext, argv)
+        decl, files = preprocess_all(sources)
+        transform_all(decl, files, type_info)
+    finally:
+        shutil.rmtree(workpath)
+
+
+def get_sources(db):
+    for record in db:
+        dirpath = record["directory"]
+        pathname = record["file"]
+        assert pathname.startswith("/")
+        ext, pp = pp_ext(pathname)
+        if pp is None:
+            continue
+        yield (dirpath, pathname, ext, pp, shlex.split(record["command"]))
+
+
+def learn_types(dirpath, pathname, ext, argv):
+    test_source = "fstracecheck2_types" + ext
+    with open(test_source, "w") as f:
+        f.write(
+            r"""#include <inttypes.h>
+FSTRACECHECK %b
+ "d"
+FSTRACECHECK %d
+ "d"
+FSTRACECHECK %u
+ "u"
+FSTRACECHECK %x
+ "x"
+FSTRACECHECK %z
+ "zd"
+FSTRACECHECK %64d
+ PRId64
+FSTRACECHECK %64u
+ PRIu64
+FSTRACECHECK %64x
+ PRIx64
+FSTRACECHECK %f
+ "f"
+FSTRACECHECK %s
+ "s"
+FSTRACECHECK %S
+ "s%zd"
+FSTRACECHECK %I
+ "p%p"
+FSTRACECHECK %J
+ "p%p"
+FSTRACECHECK %A
+ "p%zd"
+FSTRACECHECK %B
+ "p%zd"
+FSTRACECHECK %p
+ "p"
+FSTRACECHECK %E
+ "d"
+FSTRACECHECK %a
+ "p%u"
+"""
+        )
+    subprocess.check_call(
+        list(form_tstcmd(argv, dirpath, pathname, test_source))
+    )
+    type_info = {}
+    with open(test_source + ".i") as f:
+        fstrace = None
+        for line in f:
+            if fstrace is not None:
+                if not line.startswith("#"):
+                    printf = line.strip()
+                    if printf:
+                        type_info[fstrace] = "%" + line.strip()[1:-1]
+                        fstrace = None
+            elif line.startswith("FSTRACECHECK %"):
+                _, fstrace = line.strip().split()
+    return type_info
+
+
+def form_tstcmd(argv, dirpath, pathname, test_source):
+    obj = False
+    for arg in argv:
+        if obj:
+            obj = False
+            yield test_source + ".i"
+        elif arg == "-c":
+            yield "-E"
+        elif arg == "-o":
+            obj = True
+            yield arg
+        elif os.path.join(dirpath, arg) == pathname:
+            yield test_source
+        else:
+            yield arg
+
+
+def preprocess_all(sources):
+    decl = []
+    files = []
+    for dirpath, pathname, _, pp, argv in sources:
+        x_output, pp_output = preprocess(dirpath, pathname, pp, argv)
+        if x_output is not None:
+            files.append((dirpath, pathname, x_output, pp_output, argv))
+            for d in declarations(x_output):
+                decl.append(d)
+    return decl, files
+
+
+def preprocess(dirpath, pathname, pp, argv):
+    x_output = "." + pathname + ".x"
+    pp_output = x_output + pp
+    try:
+        os.makedirs(os.path.dirname(x_output))
+    except OSError:
+        pass
+    subprocess.check_call(list(form_ppcmd(argv, dirpath, pathname, x_output)))
+    return x_output, pp_output
+
+
+def pp_ext(pathname):
+    extensions = [
+        (".c", ".i"),
+        (".cpp", ".ii"),
+        (".C", ".ii"),
+        (".cc", ".ii"),
+        (".cp", ".ii"),
+        (".cxx", ".ii"),
+        (".c++", ".ii"),
+    ]
+    for ext, pp in extensions:
+        if pathname.endswith(ext):
+            return (ext, pp)
+    return None
+
+
+def form_ppcmd(argv, dirpath, pathname, x_output):
+    obj = False
+    for arg in argv:
+        if obj:
+            obj = False
+            yield x_output
+        elif arg == "-c":
+            yield "-E"
+        elif arg == "-o":
+            obj = True
+            yield arg
+        elif os.path.join(dirpath, arg) == pathname:
+            yield pathname
+        else:
+            yield arg
+
+
+def transform_all(decl, files, type_info):
+    def printf_equivalent(directive):
+        return type_info.get(directive, "")
+
+    translations = {
+        entry: "".join(map(printf_equivalent, directives(descr)))
+        for entry, descr in decl
+    }
+    passed = True
+    for dirpath, pathname, x_output, pp_output, argv in files:
+        transform(x_output, pp_output, translations)
+        if not check(dirpath, pathname, pp_output, argv):
+            passed = False
+
+
+def declarations(pathname):
+    f_in = open(pathname)
+    try:
+        source = f_in.read()
+    finally:
+        f_in.close()
+    for m in DECL_PTN1.finditer(source):
+        yield m.group("entry"), m.group("descr")
+    for m in DECL_PTN2.finditer(source):
+        yield m.group("entry"), m.group("descr")
+
+
+def directives(descr):
+    return DESCR_PTN.findall(descr)
+
+
+def transform(x_output, pp_output, translations):
+    with open(x_output) as f:
+        source = f.read()
+    cursor = 0
+    with open(pp_output, "w") as f_out:
+        for m in LOG_PTN.finditer(source):
+            try:
+                translation = translations[m.group("entry")]
+            except KeyError:
+                f_out.write(source[cursor : m.end()])
+                cursor = m.end()
+                continue
+            f_out.write(
+                '{}printf("%s%u{}"'.format(
+                    source[cursor : m.start()], translation
+                )
+            )
+            cursor = m.end()
+        f_out.write(source[cursor:])
+
+
+def check(dirpath, pathname, pp_output, argv):
+    return (
+        subprocess.call(list(form_cccmd(argv, dirpath, pathname, pp_output)))
+        == 0
+    )
+
+
+def form_cccmd(argv, dirpath, pathname, pp_output):
+    obj = False
+    for arg in argv:
+        if obj:
+            obj = False
+            yield pp_output + ".o"
+        elif arg == "-o":
+            obj = True
+            yield arg
+        elif os.path.join(dirpath, arg) == pathname:
+            yield pp_output
+        else:
+            yield arg
+
+
+if __name__ == "__main__":
+    main()
