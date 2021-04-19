@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os, sys, re, argparse, subprocess, tempfile, json, shlex
+import os, sys, re, argparse, subprocess, tempfile, json, shlex, queue, _thread
 
 DECL_PTN1 = re.compile(
     r"\bTRC\s*\.\s*(?P<entry>\w+)\s*=\s*fstrace_declare\s*\(\s*\w+\s*,"
@@ -51,6 +51,7 @@ LOG_PTN = re.compile(r"\bfstrace_log_2\s*\(\s*(TRC\s*.\s*)?(?P<entry>\w+)\b")
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("-j", "--jobs", type=int)
     parser.add_argument("compdb")
     args = parser.parse_args()
     with open(args.compdb) as dbf:
@@ -60,8 +61,8 @@ def main():
         sources = list(get_sources(db))
         dirpath, pathname, ext, _, argv = sources[0]
         type_info = learn_types(dirpath, pathname, ext, argv)
-        decl, files = preprocess_all(sources)
-        if not transform_all(decl, files, type_info):
+        decl, files = preprocess_all(sources, args.jobs)
+        if not transform_all(decl, files, type_info, args.jobs):
             sys.exit(1)
 
 
@@ -155,11 +156,12 @@ def form_tstcmd(argv, dirpath, pathname, test_source):
     yield "-Wno-unused-command-line-argument"
 
 
-def preprocess_all(sources):
+def preprocess_all(sources, jobs):
     decl = []
     files = []
-    for dirpath, pathname, _, pp, argv in sources:
-        x_output, pp_output = preprocess(dirpath, pathname, pp, argv)
+    for dirpath, pathname, x_output, pp_output, argv in in_parallel(
+        jobs, sources, preprocess, None
+    ):
         if x_output is not None:
             files.append((dirpath, pathname, x_output, pp_output, argv))
             for d in declarations(x_output):
@@ -167,7 +169,8 @@ def preprocess_all(sources):
     return decl, files
 
 
-def preprocess(dirpath, pathname, pp, argv):
+def preprocess(q, args, _):
+    dirpath, pathname, _, pp, argv = args
     x_output = "." + pathname + ".x"
     pp_output = x_output + pp
     try:
@@ -175,7 +178,7 @@ def preprocess(dirpath, pathname, pp, argv):
     except OSError:
         pass
     subprocess.check_call(list(form_ppcmd(argv, dirpath, pathname, x_output)))
-    return x_output, pp_output
+    q.put((dirpath, pathname, x_output, pp_output, argv))
 
 
 def pp_ext(pathname):
@@ -212,7 +215,7 @@ def form_ppcmd(argv, dirpath, pathname, x_output):
     yield "-Wno-unused-command-line-argument"
 
 
-def transform_all(decl, files, type_info):
+def transform_all(decl, files, type_info, jobs):
     def printf_equivalent(directive):
         return type_info.get(directive, "")
 
@@ -220,12 +223,16 @@ def transform_all(decl, files, type_info):
         entry: "".join(map(printf_equivalent, directives(descr)))
         for entry, descr in decl
     }
-    passed = True
-    for dirpath, pathname, x_output, pp_output, argv in files:
-        transform(x_output, pp_output, translations)
-        if not check(dirpath, pathname, pp_output, argv):
-            passed = False
-    return passed
+    return all(
+        # list() to prevent short-circuiting
+        list(in_parallel(jobs, files, transform_and_check, translations))
+    )
+
+
+def transform_and_check(q, args, translations):
+    dirpath, pathname, x_output, pp_output, argv = args
+    transform(x_output, pp_output, translations)
+    q.put(check(dirpath, pathname, pp_output, argv))
 
 
 def declarations(pathname):
@@ -286,6 +293,20 @@ def form_cccmd(argv, dirpath, pathname, pp_output):
         else:
             yield arg
     yield "-Wno-unused-command-line-argument"
+    yield "-O0"  # quicker
+
+
+def in_parallel(jobs, to_do, func, env):
+    q = queue.Queue()
+    in_flight = 0
+    for args in to_do:
+        if in_flight < jobs:
+            in_flight += 1
+        else:
+            yield q.get()
+        _thread.start_new_thread(func, (q, args, env))
+    for _ in range(in_flight):
+        yield q.get()
 
 
 if __name__ == "__main__":
