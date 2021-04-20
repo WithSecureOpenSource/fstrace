@@ -62,8 +62,12 @@ def main():
         sources = list(get_sources(db))
         dirpath, pathname, ext, _, argv = sources[0]
         type_info = learn_types(dirpath, pathname, ext, argv)
-        decl, files = preprocess_all(sources, args.jobs)
-        if not transform_all(decl, files, type_info, args.jobs):
+        if args.jobs is not None:
+            jobs = args.jobs
+        else:
+            jobs = int(os.getenv("FSTRACECHECK_JOBS", "1"))
+        decl, files = preprocess_all(sources, jobs)
+        if not transform_all(decl, files, type_info, jobs):
             sys.exit(1)
 
 
