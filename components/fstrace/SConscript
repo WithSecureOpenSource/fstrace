@@ -4,7 +4,7 @@ import os
 
 include = env.Install('include', ['#include/fstrace.h'])
 lib = env.Install('lib', ['../../src/libfstrace.a'])
-env.Install('etc', ['#etc/fstracecheck.py'])
+env.Command('etc/fstracecheck.py', [], 'ln -sf ../bin/fstracecheck $TARGET')
 fstracecheck = env.Install('bin', ['#bin/fstracecheck','#bin/fstracecheck2'])
 
 env.Alias(
