@@ -86,7 +86,8 @@ def learn_types(dirpath, pathname, ext, argv):
     test_source = "fstracecheck2_types" + ext
     with open(test_source, "w") as f:
         f.write(
-            r"""#include <inttypes.h>
+            r"""#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 FSTRACECHECK %b
  "d"
 FSTRACECHECK %d
