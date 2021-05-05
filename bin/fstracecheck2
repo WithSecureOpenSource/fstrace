@@ -180,13 +180,16 @@ def preprocess_all(sources, jobs):
 
 
 def preprocess(dirpath, pathname, pp, argv):
-    x_output = "." + pathname + ".x"
+    x_output = os.path.abspath(pathname + ".x")
     pp_output = x_output + pp
     try:
         os.makedirs(os.path.dirname(x_output))
     except OSError:
         pass
-    subprocess.check_call(list(form_ppcmd(argv, dirpath, pathname, x_output)))
+    subprocess.check_call(
+        list(form_ppcmd(argv, dirpath, pathname, x_output)),
+        cwd=dirpath,
+    )
     return (dirpath, pathname, x_output, pp_output, argv)
 
 
