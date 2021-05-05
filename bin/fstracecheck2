@@ -145,11 +145,16 @@ FSTRACECHECK %a
 
 
 def form_tstcmd(argv, dirpath, pathname, test_source):
+    arch = False
     obj = False
     for arg in argv:
         if obj:
             obj = False
             yield test_source + ".i"
+        elif arg == "-arch":
+            arch = True
+        elif arch:
+            arch = False
         elif arg == "-c":
             yield "-E"
         elif arg == "-o":
@@ -210,11 +215,16 @@ def pp_ext(pathname):
 
 
 def form_ppcmd(argv, dirpath, pathname, x_output):
+    arch = False
     obj = False
     for arg in argv:
         if obj:
             obj = False
             yield x_output
+        elif arg == "-arch":
+            arch = True
+        elif arch:
+            arch = False
         elif arg == "-c":
             yield "-E"
         elif arg == "-o":
