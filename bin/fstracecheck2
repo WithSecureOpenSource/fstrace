@@ -217,6 +217,8 @@ def form_ppcmd(argv, dirpath, pathname, x_output):
         elif arg == "-o":
             obj = True
             yield arg
+        elif arg.startswith("-I") and not arg.startswith("-I/"):
+            yield "-I{}/{}".format(dirpath, arg[2:])
         elif os.path.join(dirpath, arg) == pathname:
             yield pathname
         else:
