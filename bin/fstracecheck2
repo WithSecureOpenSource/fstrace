@@ -180,7 +180,7 @@ def preprocess_all(sources, jobs):
 
 
 def preprocess(dirpath, pathname, pp, argv):
-    x_output = os.path.abspath(pathname + ".x")
+    x_output = os.path.abspath("." + pathname + ".x")
     pp_output = x_output + pp
     try:
         os.makedirs(os.path.dirname(x_output))
