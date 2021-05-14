@@ -313,7 +313,7 @@ const char *fstrace_hex_repr(uint64_t n);
 #ifdef __cplusplus
 }
 
-#if __cplusplus >= 201703L
+#if __cplusplus >= 201103L
 
 #include <cassert>
 #include <string>
@@ -321,6 +321,34 @@ const char *fstrace_hex_repr(uint64_t n);
 
 namespace fsecure {
 namespace fstrace {
+
+// This UniqueId class should be inherited by classes which desire to have a
+// unique identier to use in fstrace entries.
+class UniqueId {
+public:
+    UniqueId() : id_(fstrace_get_unique_id()) {}
+
+    UniqueId(UniqueId&&) = default;
+    UniqueId &operator=(UniqueId &&) = default;
+    virtual ~UniqueId() = default;
+
+    UniqueId(const UniqueId &)
+        : id_(fstrace_get_unique_id())
+    {}
+
+    UniqueId &operator=(const UniqueId &)
+    {
+        // Let both keep their ids.
+        return *this;
+    }
+
+    uint64_t id() const { return id_; }
+
+private:
+    uint64_t id_;
+};
+
+#if __cplusplus >= 201703L
 
 // This TraceIterator class should be used with %J formatter to trace contents
 // of C++ containers.
@@ -393,10 +421,12 @@ struct TraceIterator {
     const const_iterator end_;
 };
 
+#endif // #if __cplusplus >= 201703L
+
 } // namespace fstrace
 } // namespace fsecure
 
-#endif // #if __cplusplus >= 201703L
+#endif // #if __cplusplus >= 201103L
 
 #endif
 
