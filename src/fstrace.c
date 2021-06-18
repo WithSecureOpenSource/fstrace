@@ -1,29 +1,32 @@
 /* Copyright (C) 2013, F-Secure Corporation */
 
+#include "fstrace.h"
+
+#include <assert.h>
+#include <errno.h>
+#include <netinet/in.h>
+#include <pthread.h>
+#include <regex.h>
+#include <stdatomic.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdatomic.h>
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/file.h>
-#include <unistd.h>
 #include <string.h>
-#include <stdint.h>
-#include <assert.h>
-#include <pthread.h>
-#include <errno.h>
-#include <sys/time.h>
-#include <netinet/in.h>
+#include <sys/file.h>
+#include <sys/mman.h>
 #include <sys/socket.h>
+#include <sys/time.h>
+#include <sys/types.h>
 #include <sys/un.h>
-#include <regex.h>
+#include <unistd.h>
+
 #include <fsdyn/charstr.h>
 #include <fsdyn/date.h>
 #include <fsdyn/fsalloc.h>
-#include "fstrace.h"
+
 #include "fstrace_imp.h"
 
-#define straux(s) #s
+#define straux(s)    #s
 #define stringify(s) straux(s)
 const char *fstrace_version_tag = "F-S_v:: fstrace " stringify(BUILD);
 
@@ -36,11 +39,11 @@ static enum {
 static sigset_t SIG_MASK;
 static int THE_MUTEX; /* serializes processes */
 static pthread_mutex_t the_mutex =
-    PTHREAD_MUTEX_INITIALIZER;  /* serializes threads */
+    PTHREAD_MUTEX_INITIALIZER; /* serializes threads */
 static char lock_path[1000] = "/tmp/fstrace.lock.XXXXXX";
 static uid_t THE_USER_ID;
 static gid_t THE_GROUP_ID;
-static uint64_t pid_infix;   /* derived from getpid() */
+static uint64_t pid_infix; /* derived from getpid() */
 static atomic_uint_fast64_t next_unique_id;
 
 static void update_pid_infix()
@@ -66,11 +69,12 @@ static void __attribute__((destructor)) unique_destructor(void)
         unlink(lock_path);
 }
 
-unsigned FSTRACE_FAILURE_LINE;  /* for the debugger */
+unsigned FSTRACE_FAILURE_LINE; /* for the debugger */
 
-#define FSTRACE_FAIL() do {                     \
-        FSTRACE_FAILURE_LINE = __LINE__;        \
-        fstrace_state = FSTRACE_STATE_ERRORED;  \
+#define FSTRACE_FAIL()                         \
+    do {                                       \
+        FSTRACE_FAILURE_LINE = __LINE__;       \
+        fstrace_state = FSTRACE_STATE_ERRORED; \
     } while (false)
 
 uint64_t fstrace_get_unique_id()
@@ -84,7 +88,7 @@ static fstrace_memblock_t *replenish_mempool(fstrace_t *trace)
     fstrace_memblock_t *block = fsalloc(sizeof *block);
     block->start = mmap(NULL, BLOCK_SIZE, PROT_READ | PROT_WRITE,
                         MAP_ANON | MAP_SHARED, -1, 0);
-    assert(block->start != NULL); 
+    assert(block->start != NULL);
     block->free = block->start;
     list_append(trace->mempool, block);
     return block;
@@ -94,8 +98,8 @@ static void *shared_alloc(fstrace_t *trace, size_t size)
 {
     /* assert: trace is locked */
     assert(size <= BLOCK_SIZE);
-    fstrace_memblock_t *block = (fstrace_memblock_t *)
-        list_elem_get_value(list_get_last(trace->mempool));
+    fstrace_memblock_t *block = (fstrace_memblock_t *) list_elem_get_value(
+        list_get_last(trace->mempool));
     size_t remaining = block->start + BLOCK_SIZE - block->free;
     if (remaining < size)
         block = replenish_mempool(trace);
@@ -171,8 +175,7 @@ static fstrace_t *do_open(const char *pathname_prefix, ssize_t rotate_size,
         trace->outf = outf;
     } else {
         trace->rotatable =
-            make_rotatable(pathname_prefix, ".log", rotate_size,
-                           trace->params);
+            make_rotatable(pathname_prefix, ".log", rotate_size, trace->params);
         rotatable_set_mode(trace->rotatable, 0600);
         struct timeval tv;
         gettimeofday(&tv, NULL);
@@ -200,8 +203,8 @@ static void flush_fields(list_t *fields)
     if (!fields)
         return;
     while (!list_empty(fields)) {
-        struct fstrace_field *f = (struct fstrace_field *)
-            list_pop_first(fields);
+        struct fstrace_field *f =
+            (struct fstrace_field *) list_pop_first(fields);
         fsfree(f->leader);
         fsfree(f);
     }
@@ -223,8 +226,8 @@ int fstrace_close(fstrace_t *trace)
     destroy_list(trace->events);
     free(trace->pathname_prefix);
     while (!list_empty(trace->mempool)) {
-        fstrace_memblock_t *block = (fstrace_memblock_t *)
-            list_pop_first(trace->mempool);
+        fstrace_memblock_t *block =
+            (fstrace_memblock_t *) list_pop_first(trace->mempool);
         int status = munmap(block->start, BLOCK_SIZE);
         fsfree(block);
         assert(status >= 0);
@@ -312,14 +315,12 @@ static void process_signed64(fstrace_t *trace, va_list *pap)
 
 static void process_unsigned64(fstrace_t *trace, va_list *pap)
 {
-    fprintf(trace->outf, "%llu",
-            (unsigned long long) va_arg(*pap, uint64_t));
+    fprintf(trace->outf, "%llu", (unsigned long long) va_arg(*pap, uint64_t));
 }
 
 static void process_hex64(fstrace_t *trace, va_list *pap)
 {
-    fprintf(trace->outf, "%llx",
-            (unsigned long long) va_arg(*pap, uint64_t));
+    fprintf(trace->outf, "%llx", (unsigned long long) va_arg(*pap, uint64_t));
 }
 
 static void process_ssize_t(fstrace_t *trace, va_list *pap)
@@ -374,7 +375,7 @@ static void process_limited_string(fstrace_t *trace, va_list *pap)
 
 static void process_indirect_string(fstrace_t *trace, va_list *pap)
 {
-    const char *(*func)(void *) = va_arg(*pap, const char *(*)(void *));
+    const char *(*func)(void *) = va_arg(*pap, const char *(*) (void *) );
     void *arg = va_arg(*pap, void *);
     const char *begin = arg ? func(arg) : NULL;
     emit_string(trace->outf, begin, NULL);
@@ -382,7 +383,7 @@ static void process_indirect_string(fstrace_t *trace, va_list *pap)
 
 static void process_iteration(fstrace_t *trace, va_list *pap)
 {
-    const char *(*func)(void *) = va_arg(*pap, const char *(*)(void *));
+    const char *(*func)(void *) = va_arg(*pap, const char *(*) (void *) );
     void *arg = va_arg(*pap, void *);
     emit_byte_verbatim(trace->outf, '[');
     const char *s = func(arg);
@@ -443,174 +444,323 @@ static void process_line(fstrace_t *trace, va_list *pap)
 static const char *errid(int err)
 {
     switch (err) {
-        case E2BIG:           return "E2BIG";
-        case EACCES:          return "EACCES";
-        case EADDRINUSE:      return "EADDRINUSE";
-        case EADDRNOTAVAIL:   return "EADDRNOTAVAIL";
-        case EAFNOSUPPORT:    return "EAFNOSUPPORT";
-        case EAGAIN:          return "EAGAIN";
-        case EALREADY:        return "EALREADY";
-        case EBADF:           return "EBADF";
-        case EBADMSG:         return "EBADMSG";
-        case EBUSY:           return "EBUSY";
-        case ECANCELED:       return "ECANCELED";
-        case ECHILD:          return "ECHILD";
-        case ECONNABORTED:    return "ECONNABORTED";
-        case ECONNREFUSED:    return "ECONNREFUSED";
-        case ECONNRESET:      return "ECONNRESET";
-        case EDEADLK:         return "EDEADLK";
-        case EDESTADDRREQ:    return "EDESTADDRREQ";
-        case EDOM:            return "EDOM";
-        case EDQUOT:          return "EDQUOT";
-        case EEXIST:          return "EEXIST";
-        case EFAULT:          return "EFAULT";
-        case EFBIG:           return "EFBIG";
-        case EHOSTDOWN:       return "EHOSTDOWN";
-        case EHOSTUNREACH:    return "EHOSTUNREACH";
-        case EIDRM:           return "EIDRM";
-        case EILSEQ:          return "EILSEQ";
-        case EINPROGRESS:     return "EINPROGRESS";
-        case EINTR:           return "EINTR";
-        case EINVAL:          return "EINVAL";
-        case EIO:             return "EIO";
-        case EISCONN:         return "EISCONN";
-        case EISDIR:          return "EISDIR";
-        case ELOOP:           return "ELOOP";
-        case EMFILE:          return "EMFILE";
-        case EMLINK:          return "EMLINK";
-        case EMSGSIZE:        return "EMSGSIZE";
+        case E2BIG:
+            return "E2BIG";
+        case EACCES:
+            return "EACCES";
+        case EADDRINUSE:
+            return "EADDRINUSE";
+        case EADDRNOTAVAIL:
+            return "EADDRNOTAVAIL";
+        case EAFNOSUPPORT:
+            return "EAFNOSUPPORT";
+        case EAGAIN:
+            return "EAGAIN";
+        case EALREADY:
+            return "EALREADY";
+        case EBADF:
+            return "EBADF";
+        case EBADMSG:
+            return "EBADMSG";
+        case EBUSY:
+            return "EBUSY";
+        case ECANCELED:
+            return "ECANCELED";
+        case ECHILD:
+            return "ECHILD";
+        case ECONNABORTED:
+            return "ECONNABORTED";
+        case ECONNREFUSED:
+            return "ECONNREFUSED";
+        case ECONNRESET:
+            return "ECONNRESET";
+        case EDEADLK:
+            return "EDEADLK";
+        case EDESTADDRREQ:
+            return "EDESTADDRREQ";
+        case EDOM:
+            return "EDOM";
+        case EDQUOT:
+            return "EDQUOT";
+        case EEXIST:
+            return "EEXIST";
+        case EFAULT:
+            return "EFAULT";
+        case EFBIG:
+            return "EFBIG";
+        case EHOSTDOWN:
+            return "EHOSTDOWN";
+        case EHOSTUNREACH:
+            return "EHOSTUNREACH";
+        case EIDRM:
+            return "EIDRM";
+        case EILSEQ:
+            return "EILSEQ";
+        case EINPROGRESS:
+            return "EINPROGRESS";
+        case EINTR:
+            return "EINTR";
+        case EINVAL:
+            return "EINVAL";
+        case EIO:
+            return "EIO";
+        case EISCONN:
+            return "EISCONN";
+        case EISDIR:
+            return "EISDIR";
+        case ELOOP:
+            return "ELOOP";
+        case EMFILE:
+            return "EMFILE";
+        case EMLINK:
+            return "EMLINK";
+        case EMSGSIZE:
+            return "EMSGSIZE";
 #ifdef EMULTIHOP
-        case EMULTIHOP:       return "EMULTIHOP";
+        case EMULTIHOP:
+            return "EMULTIHOP";
 #endif
-        case ENAMETOOLONG:    return "ENAMETOOLONG";
-        case ENETDOWN:        return "ENETDOWN";
-        case ENETRESET:       return "ENETRESET";
-        case ENETUNREACH:     return "ENETUNREACH";
-        case ENFILE:          return "ENFILE";
-        case ENOBUFS:         return "ENOBUFS";
+        case ENAMETOOLONG:
+            return "ENAMETOOLONG";
+        case ENETDOWN:
+            return "ENETDOWN";
+        case ENETRESET:
+            return "ENETRESET";
+        case ENETUNREACH:
+            return "ENETUNREACH";
+        case ENFILE:
+            return "ENFILE";
+        case ENOBUFS:
+            return "ENOBUFS";
 #ifdef ENODATA
-        case ENODATA:         return "ENODATA";
+        case ENODATA:
+            return "ENODATA";
 #endif
-        case ENODEV:          return "ENODEV";
-        case ENOENT:          return "ENOENT";
-        case ENOEXEC:         return "ENOEXEC";
-        case ENOLCK:          return "ENOLCK";
+        case ENODEV:
+            return "ENODEV";
+        case ENOENT:
+            return "ENOENT";
+        case ENOEXEC:
+            return "ENOEXEC";
+        case ENOLCK:
+            return "ENOLCK";
 #ifdef ENOLINK
-        case ENOLINK:         return "ENOLINK";
+        case ENOLINK:
+            return "ENOLINK";
 #endif
-        case ENOMEM:          return "ENOMEM";
-        case ENOMSG:          return "ENOMSG";
-        case ENOPROTOOPT:     return "ENOPROTOOPT";
-        case ENOSPC:          return "ENOSPC";
+        case ENOMEM:
+            return "ENOMEM";
+        case ENOMSG:
+            return "ENOMSG";
+        case ENOPROTOOPT:
+            return "ENOPROTOOPT";
+        case ENOSPC:
+            return "ENOSPC";
 #ifdef ENOSR
-        case ENOSR:           return "ENOSR";
+        case ENOSR:
+            return "ENOSR";
 #endif
 #ifdef ENOSTR
-        case ENOSTR:          return "ENOSTR";
+        case ENOSTR:
+            return "ENOSTR";
 #endif
-        case ENOSYS:          return "ENOSYS";
-        case ENOTBLK:         return "ENOTBLK";
-        case ENOTCONN:        return "ENOTCONN";
-        case ENOTDIR:         return "ENOTDIR";
-        case ENOTEMPTY:       return "ENOTEMPTY";
-        case ENOTRECOVERABLE: return "ENOTRECOVERABLE";
-        case ENOTSOCK:        return "ENOTSOCK";
-        case ENOTTY:          return "ENOTTY";
-        case ENXIO:           return "ENXIO";
-        case EOPNOTSUPP:      return "EOPNOTSUPP";
-        case EOVERFLOW:       return "EOVERFLOW";
-        case EOWNERDEAD:      return "EOWNERDEAD";
-        case EPERM:           return "EPERM";
-        case EPFNOSUPPORT:    return "EPFNOSUPPORT";
-        case EPIPE:           return "EPIPE";
-        case EPROTO:          return "EPROTO";
-        case EPROTONOSUPPORT: return "EPROTONOSUPPORT";
-        case EPROTOTYPE:      return "EPROTOTYPE";
-        case ERANGE:          return "ERANGE";
-        case EREMOTE:         return "EREMOTE";
-        case EROFS:           return "EROFS";
-        case ESHUTDOWN:       return "ESHUTDOWN";
-        case ESOCKTNOSUPPORT: return "ESOCKTNOSUPPORT";
-        case ESPIPE:          return "ESPIPE";
-        case ESRCH:           return "ESRCH";
-        case ESTALE:          return "ESTALE";
+        case ENOSYS:
+            return "ENOSYS";
+        case ENOTBLK:
+            return "ENOTBLK";
+        case ENOTCONN:
+            return "ENOTCONN";
+        case ENOTDIR:
+            return "ENOTDIR";
+        case ENOTEMPTY:
+            return "ENOTEMPTY";
+        case ENOTRECOVERABLE:
+            return "ENOTRECOVERABLE";
+        case ENOTSOCK:
+            return "ENOTSOCK";
+        case ENOTTY:
+            return "ENOTTY";
+        case ENXIO:
+            return "ENXIO";
+        case EOPNOTSUPP:
+            return "EOPNOTSUPP";
+        case EOVERFLOW:
+            return "EOVERFLOW";
+        case EOWNERDEAD:
+            return "EOWNERDEAD";
+        case EPERM:
+            return "EPERM";
+        case EPFNOSUPPORT:
+            return "EPFNOSUPPORT";
+        case EPIPE:
+            return "EPIPE";
+        case EPROTO:
+            return "EPROTO";
+        case EPROTONOSUPPORT:
+            return "EPROTONOSUPPORT";
+        case EPROTOTYPE:
+            return "EPROTOTYPE";
+        case ERANGE:
+            return "ERANGE";
+        case EREMOTE:
+            return "EREMOTE";
+        case EROFS:
+            return "EROFS";
+        case ESHUTDOWN:
+            return "ESHUTDOWN";
+        case ESOCKTNOSUPPORT:
+            return "ESOCKTNOSUPPORT";
+        case ESPIPE:
+            return "ESPIPE";
+        case ESRCH:
+            return "ESRCH";
+        case ESTALE:
+            return "ESTALE";
 #ifdef ETIME
-        case ETIME:           return "ETIME";
+        case ETIME:
+            return "ETIME";
 #endif
-        case ETIMEDOUT:       return "ETIMEDOUT";
-        case ETOOMANYREFS:    return "ETOOMANYREFS";
-        case ETXTBSY:         return "ETXTBSY";
-        case EUSERS:          return "EUSERS";
-        case EXDEV:           return "EXDEV";
+        case ETIMEDOUT:
+            return "ETIMEDOUT";
+        case ETOOMANYREFS:
+            return "ETOOMANYREFS";
+        case ETXTBSY:
+            return "ETXTBSY";
+        case EUSERS:
+            return "EUSERS";
+        case EXDEV:
+            return "EXDEV";
 #ifdef __linux__
-        case EADV:            return "EADV";
-        case EBADE:           return "EBADE";
-        case EBADFD:          return "EBADFD";
-        case EBADR:           return "EBADR";
-        case EBADRQC:         return "EBADRQC";
-        case EBADSLT:         return "EBADSLT";
-        case EBFONT:          return "EBFONT";
-        case ECHRNG:          return "ECHRNG";
-        case ECOMM:           return "ECOMM";
-        case EDOTDOT:         return "EDOTDOT";
+        case EADV:
+            return "EADV";
+        case EBADE:
+            return "EBADE";
+        case EBADFD:
+            return "EBADFD";
+        case EBADR:
+            return "EBADR";
+        case EBADRQC:
+            return "EBADRQC";
+        case EBADSLT:
+            return "EBADSLT";
+        case EBFONT:
+            return "EBFONT";
+        case ECHRNG:
+            return "ECHRNG";
+        case ECOMM:
+            return "ECOMM";
+        case EDOTDOT:
+            return "EDOTDOT";
 #ifdef EHWPOISON
-        case EHWPOISON:       return "EHWPOISON";
+        case EHWPOISON:
+            return "EHWPOISON";
 #endif
-        case EISNAM:          return "EISNAM";
-        case EKEYEXPIRED:     return "EKEYEXPIRED";
-        case EKEYREJECTED:    return "EKEYREJECTED";
-        case EKEYREVOKED:     return "EKEYREVOKED";
-        case EL2HLT:          return "EL2HLT";
-        case EL2NSYNC:        return "EL2NSYNC";
-        case EL3HLT:          return "EL3HLT";
-        case EL3RST:          return "EL3RST";
-        case ELIBACC:         return "ELIBACC";
-        case ELIBBAD:         return "ELIBBAD";
-        case ELIBEXEC:        return "ELIBEXEC";
-        case ELIBMAX:         return "ELIBMAX";
-        case ELIBSCN:         return "ELIBSCN";
-        case ELNRNG:          return "ELNRNG";
-        case EMEDIUMTYPE:     return "EMEDIUMTYPE";
-        case ENAVAIL:         return "ENAVAIL";
-        case ENOANO:          return "ENOANO";
-        case ENOCSI:          return "ENOCSI";
-        case ENOKEY:          return "ENOKEY";
-        case ENOMEDIUM:       return "ENOMEDIUM";
-        case ENONET:          return "ENONET";
-        case ENOPKG:          return "ENOPKG";
-        case ENOTNAM:         return "ENOTNAM";
-        case ENOTUNIQ:        return "ENOTUNIQ";
-        case EREMCHG:         return "EREMCHG";
-        case EREMOTEIO:       return "EREMOTEIO";
-        case ERESTART:        return "ERESTART";
-        case ERFKILL:         return "ERFKILL";
-        case ESRMNT:          return "ESRMNT";
-        case ESTRPIPE:        return "ESTRPIPE";
-        case EUCLEAN:         return "EUCLEAN";
-        case EUNATCH:         return "EUNATCH";
-        case EXFULL:          return "EXFULL";
+        case EISNAM:
+            return "EISNAM";
+        case EKEYEXPIRED:
+            return "EKEYEXPIRED";
+        case EKEYREJECTED:
+            return "EKEYREJECTED";
+        case EKEYREVOKED:
+            return "EKEYREVOKED";
+        case EL2HLT:
+            return "EL2HLT";
+        case EL2NSYNC:
+            return "EL2NSYNC";
+        case EL3HLT:
+            return "EL3HLT";
+        case EL3RST:
+            return "EL3RST";
+        case ELIBACC:
+            return "ELIBACC";
+        case ELIBBAD:
+            return "ELIBBAD";
+        case ELIBEXEC:
+            return "ELIBEXEC";
+        case ELIBMAX:
+            return "ELIBMAX";
+        case ELIBSCN:
+            return "ELIBSCN";
+        case ELNRNG:
+            return "ELNRNG";
+        case EMEDIUMTYPE:
+            return "EMEDIUMTYPE";
+        case ENAVAIL:
+            return "ENAVAIL";
+        case ENOANO:
+            return "ENOANO";
+        case ENOCSI:
+            return "ENOCSI";
+        case ENOKEY:
+            return "ENOKEY";
+        case ENOMEDIUM:
+            return "ENOMEDIUM";
+        case ENONET:
+            return "ENONET";
+        case ENOPKG:
+            return "ENOPKG";
+        case ENOTNAM:
+            return "ENOTNAM";
+        case ENOTUNIQ:
+            return "ENOTUNIQ";
+        case EREMCHG:
+            return "EREMCHG";
+        case EREMOTEIO:
+            return "EREMOTEIO";
+        case ERESTART:
+            return "ERESTART";
+        case ERFKILL:
+            return "ERFKILL";
+        case ESRMNT:
+            return "ESRMNT";
+        case ESTRPIPE:
+            return "ESTRPIPE";
+        case EUCLEAN:
+            return "EUCLEAN";
+        case EUNATCH:
+            return "EUNATCH";
+        case EXFULL:
+            return "EXFULL";
 #else
-        case EAUTH:           return "EAUTH";
-        case EBADRPC:         return "EBADRPC";
-        case EFTYPE:          return "EFTYPE";
-        case ENEEDAUTH:       return "ENEEDAUTH";
-        case ENOATTR:         return "ENOATTR";
-        case EPROCLIM:        return "EPROCLIM";
-        case EPROCUNAVAIL:    return "EPROCUNAVAIL";
-        case EPROGMISMATCH:   return "EPROGMISMATCH";
-        case EPROGUNAVAIL:    return "EPROGUNAVAIL";
-        case ERPCMISMATCH:    return "ERPCMISMATCH";
+        case EAUTH:
+            return "EAUTH";
+        case EBADRPC:
+            return "EBADRPC";
+        case EFTYPE:
+            return "EFTYPE";
+        case ENEEDAUTH:
+            return "ENEEDAUTH";
+        case ENOATTR:
+            return "ENOATTR";
+        case EPROCLIM:
+            return "EPROCLIM";
+        case EPROCUNAVAIL:
+            return "EPROCUNAVAIL";
+        case EPROGMISMATCH:
+            return "EPROGMISMATCH";
+        case EPROGUNAVAIL:
+            return "EPROGUNAVAIL";
+        case ERPCMISMATCH:
+            return "ERPCMISMATCH";
 #ifdef __APPLE__
-        case EBADARCH:        return "EBADARCH";
-        case EBADEXEC:        return "EBADEXEC";
-        case EBADMACHO:       return "EBADMACHO";
-        case EDEVERR:         return "EDEVERR";
-        case ENOPOLICY:       return "ENOPOLICY";
-        case EPWROFF:         return "EPWROFF";
-        case ESHLIBVERS:      return "ESHLIBVERS";
+        case EBADARCH:
+            return "EBADARCH";
+        case EBADEXEC:
+            return "EBADEXEC";
+        case EBADMACHO:
+            return "EBADMACHO";
+        case EDEVERR:
+            return "EDEVERR";
+        case ENOPOLICY:
+            return "ENOPOLICY";
+        case EPWROFF:
+            return "EPWROFF";
+        case ESHLIBVERS:
+            return "ESHLIBVERS";
 #endif
 #endif
-        default: return NULL;
+        default:
+            return NULL;
     }
 }
 
@@ -619,7 +769,8 @@ static void process_errno(fstrace_t *trace, va_list *pap)
     const char *id = errid(trace->err);
     if (id)
         fputs(id, trace->outf);
-    else fprintf(trace->outf, "%d", trace->err);
+    else
+        fprintf(trace->outf, "%d", trace->err);
 }
 
 static void process_errno_arg(fstrace_t *trace, va_list *pap)
@@ -628,7 +779,8 @@ static void process_errno_arg(fstrace_t *trace, va_list *pap)
     const char *id = errid(err);
     if (id)
         fputs(id, trace->outf);
-    else fprintf(trace->outf, "%d", err);
+    else
+        fprintf(trace->outf, "%d", err);
 }
 
 static void process_pointer(fstrace_t *trace, va_list *pap)
@@ -653,9 +805,8 @@ static void emit_ipv4_address(FILE *outf, const struct sockaddr_in *addr,
     }
     unsigned port = ntohs(addr->sin_port);
     unsigned long addr4 = ntohl(addr->sin_addr.s_addr);
-    fprintf(outf, "AF_INET`%lu.%lu.%lu.%lu`%u",
-            addr4 >> 24 & 0xff, addr4 >> 16 & 0xff, addr4 >> 8 & 0xff,
-            addr4 & 0xff, port);
+    fprintf(outf, "AF_INET`%lu.%lu.%lu.%lu`%u", addr4 >> 24 & 0xff,
+            addr4 >> 16 & 0xff, addr4 >> 8 & 0xff, addr4 & 0xff, port);
 }
 
 static void emit_ipv6_segment(FILE *outf, const uint16_t *p,
@@ -748,8 +899,7 @@ static void process_address(fstrace_t *trace, va_list *pap)
                 emit_unix_address(trace->outf,
                                   (const struct sockaddr_un *) addr, addrlen);
                 return;
-            default:
-                ;
+            default:;
         }
     emit_unknown_address(trace->outf, addr, addrlen);
 }
@@ -782,24 +932,16 @@ static struct field_descr {
     { "%E", process_errno_arg },
     { "%p", process_pointer },
     { "%a", process_address },
-    { NULL, }
+    { NULL },
 };
 
 /* processors that don't consume the stack */
 static void (*global_processors[])(fstrace_t *trace, va_list *pap) = {
-    separate_fields,
-    terminate_event,
-    process_percent,
-    process_pid,
-    process_tid,
-    process_file,
-    process_line,
-    process_errno,
-    NULL
+    separate_fields, terminate_event, process_percent, process_pid, process_tid,
+    process_file,    process_line,    process_errno,   NULL
 };
 
-static struct field_descr *identify_field(const char *format,
-                                          const char **next)
+static struct field_descr *identify_field(const char *format, const char **next)
 {
     struct field_descr *descr;
     for (descr = fields; descr->directive; descr++) {
@@ -812,9 +954,9 @@ static struct field_descr *identify_field(const char *format,
     return NULL;
 }
 
-static struct fstrace_field *
-make_field(char *leader,
-           void (*processor)(fstrace_t *trace, va_list *pap))
+static struct fstrace_field *make_field(char *leader,
+                                        void (*processor)(fstrace_t *trace,
+                                                          va_list *pap))
 {
     struct fstrace_field *field = fsalloc(sizeof *field);
     field->leader = leader;
@@ -859,7 +1001,7 @@ fstrace_event_t *fstrace_declare(fstrace_t *trace, const char *id,
     if (!lock(trace))
         return NULL;
     fstrace_event_t *event = shared_alloc(trace, sizeof *event);
-    event->impl = ev_imp;         /* redundant */
+    event->impl = ev_imp; /* redundant */
     event->enabled = 0;
     ev_imp->shared = event;
     list_append(trace->events, ev_imp);
@@ -895,8 +1037,8 @@ void fstrace_set_common_format(fstrace_t *trace, const char *format)
     } else {
         list_elem_t *e;
         for (e = list_get_first(trace->common_fields); e; e = list_next(e)) {
-            struct fstrace_field *f = (struct fstrace_field *)
-                list_elem_get_value(e);
+            struct fstrace_field *f =
+                (struct fstrace_field *) list_elem_get_value(e);
             assert(is_global_processor(f->processor));
         }
     }
@@ -926,14 +1068,13 @@ static bool emit_timestamp(fstrace_t *trace)
         trace->outf = rotatable_file(trace->rotatable);
     }
     fprintf(trace->outf, "%04d-%02d-%02d %02d:%02d:%02d.%06d ",
-            tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-            tm.tm_hour, tm.tm_min, tm.tm_sec, (int) tv.tv_usec);
+            tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min,
+            tm.tm_sec, (int) tv.tv_usec);
     return true;
 }
 
-static void __fstrace_log(fstrace_event_t *event,
-                          const char *file, unsigned lineno, int err,
-                          va_list *pap)
+static void __fstrace_log(fstrace_event_t *event, const char *file,
+                          unsigned lineno, int err, va_list *pap)
 {
     struct fstrace_event_impl *ev_imp = event->impl;
     fstrace_t *trace = ev_imp->trace;
@@ -943,16 +1084,14 @@ static void __fstrace_log(fstrace_event_t *event,
     fprintf(trace->outf, "%s ", ev_imp->id);
     list_elem_t *elem;
     if (trace->common_fields) {
-        for (elem = list_get_first(trace->common_fields);
-             elem != NULL;
+        for (elem = list_get_first(trace->common_fields); elem != NULL;
              elem = list_next(elem)) {
             struct fstrace_field *field = (void *) list_elem_get_value(elem);
             fprintf(trace->outf, "%s", field->leader);
             field->processor(trace, pap);
         }
     }
-    for (elem = list_get_first(ev_imp->fields);
-         elem != NULL;
+    for (elem = list_get_first(ev_imp->fields); elem != NULL;
          elem = list_next(elem)) {
         struct fstrace_field *field = (void *) list_elem_get_value(elem);
         fprintf(trace->outf, "%s", field->leader);
@@ -961,9 +1100,8 @@ static void __fstrace_log(fstrace_event_t *event,
     fflush(trace->outf);
 }
 
-static void __fstrace_lock_and_log(fstrace_event_t *event,
-                                   const char *file, unsigned lineno,
-                                   va_list *pap)
+static void __fstrace_lock_and_log(fstrace_event_t *event, const char *file,
+                                   unsigned lineno, va_list *pap)
 {
     int err = errno;
     struct fstrace_event_impl *ev_imp = event->impl;
@@ -994,8 +1132,7 @@ void fstrace_log_2(fstrace_event_t *event, const char *file, unsigned lineno,
 }
 
 void fstrace_select_safe(fstrace_t *trace,
-                         int (*select)(void *data, const char *id),
-                         void *data)
+                         int (*select)(void *data, const char *id), void *data)
 {
     if (lock(trace)) {
         fstrace_select(trace, select, data);
@@ -1003,13 +1140,11 @@ void fstrace_select_safe(fstrace_t *trace,
     }
 }
 
-void fstrace_select(fstrace_t *trace,
-                    int (*select)(void *data, const char *id),
+void fstrace_select(fstrace_t *trace, int (*select)(void *data, const char *id),
                     void *data)
 {
     list_elem_t *elem;
-    for (elem = list_get_first(trace->events);
-         elem != NULL;
+    for (elem = list_get_first(trace->events); elem != NULL;
          elem = list_next(elem)) {
         struct fstrace_event_impl *ev_imp = (void *) list_elem_get_value(elem);
         int selection = select(data, ev_imp->id);
@@ -1096,7 +1231,6 @@ int fstrace_reinit()
     }
     return 0;
 }
-
 
 int fstrace_reopen(fstrace_t *trace)
 {

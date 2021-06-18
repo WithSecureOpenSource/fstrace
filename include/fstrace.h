@@ -3,10 +3,10 @@
 #ifndef __FSTRACE__
 #define __FSTRACE__
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/types.h>
 
 #ifdef __cplusplus
@@ -134,16 +134,16 @@ static inline bool FSTRACE_ENABLED(fstrace_event_t *event)
  * not call FSTRACE() when handling SIGSEGV or SIGBUS.
  */
 #if defined(__GNUC__)
-#define FSTRACE(event, ...)                                             \
-    do {                                                                \
-        if (FSTRACE_ENABLED(event))                                     \
-            fstrace_log_2(event, __FILE__, __LINE__, ##__VA_ARGS__);    \
+#define FSTRACE(event, ...)                                          \
+    do {                                                             \
+        if (FSTRACE_ENABLED(event))                                  \
+            fstrace_log_2(event, __FILE__, __LINE__, ##__VA_ARGS__); \
     } while (0)
 #else
-#define FSTRACE(event, ...)                                             \
-    do {                                                                \
-        if (FSTRACE_ENABLED(event))                                     \
-            fstrace_log_2(event, __FILE__, __LINE__, __VA_ARGS__);      \
+#define FSTRACE(event, ...)                                        \
+    do {                                                           \
+        if (FSTRACE_ENABLED(event))                                \
+            fstrace_log_2(event, __FILE__, __LINE__, __VA_ARGS__); \
     } while (0)
 #endif
 
@@ -153,10 +153,10 @@ static inline bool FSTRACE_ENABLED(fstrace_event_t *event)
  * case. However, GCC is more flexible and allows you to use FSTRACE()
  * even in that case.
  */
-#define FSTRACE_NO_ARGS(event)                          \
-    do {                                                \
-        if (FSTRACE_ENABLED(event))                     \
-            fstrace_log_2(event, __FILE__, __LINE__);   \
+#define FSTRACE_NO_ARGS(event)                        \
+    do {                                              \
+        if (FSTRACE_ENABLED(event))                   \
+            fstrace_log_2(event, __FILE__, __LINE__); \
     } while (0)
 
 /*
@@ -171,12 +171,10 @@ static inline bool FSTRACE_ENABLED(fstrace_event_t *event)
  * declare new events simultenously. Using fstrace_select_safe() is
  * robust and should be called outside signal handlers.
  */
-void fstrace_select(fstrace_t *trace,
-                    int (*select)(void *data, const char *id),
+void fstrace_select(fstrace_t *trace, int (*select)(void *data, const char *id),
                     void *data);
 void fstrace_select_safe(fstrace_t *trace,
-                         int (*select)(void *data, const char *id),
-                         void *data);
+                         int (*select)(void *data, const char *id), void *data);
 
 /*
  * A convenience function to select/deselect based on regular
@@ -280,12 +278,13 @@ typedef struct fstrace_event_spec {
 
 /* Record a global trace event specification. Global trace events can be
  * declared en masse using fstrace_declare_globals(). */
-#define FSTRACE_DECL(id, format)                                        \
-    static fstrace_event_t *id;                                         \
-    static __attribute__((constructor)) void __construct_##id(void) {   \
-        static fstrace_event_spec_t spec;                               \
-        static char name[] = #id;                                       \
-        fstrace_specify(&spec, &id, name, format);                      \
+#define FSTRACE_DECL(id, format)                                    \
+    static fstrace_event_t *id;                                     \
+    static __attribute__((constructor)) void __construct_##id(void) \
+    {                                                               \
+        static fstrace_event_spec_t spec;                           \
+        static char name[] = #id;                                   \
+        fstrace_specify(&spec, &id, name, format);                  \
     }
 
 /* Record a global trace event specification. Meant to be used with the
@@ -293,8 +292,7 @@ typedef struct fstrace_event_spec {
  * converted to hyphens for traditional reasons. */
 void fstrace_specify(fstrace_event_spec_t *spec,
                      fstrace_event_t **event_variable,
-                     char event_variable_name[],
-                     const char *format);
+                     char event_variable_name[], const char *format);
 
 /* Call fstrace_declare() for every event that has been declared using
  * the FSTRACE_DECL macro. Please forbid calling the function for more
@@ -406,8 +404,7 @@ struct TraceIterator {
         const char *value = nullptr;
         if constexpr (std::is_same<value_type, std::string>::value) {
             value = static_cast<const std::string &>(*tracer->current_).c_str();
-        } else if constexpr (std::is_same<value_type,
-                                          uint64_t>::value) {
+        } else if constexpr (std::is_same<value_type, uint64_t>::value) {
             value = fstrace_unsigned_repr(
                 static_cast<std::uint64_t>(*tracer->current_));
         } else {
