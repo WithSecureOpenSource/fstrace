@@ -1,0 +1,48 @@
+AccessModifierOffset: -4
+AlignConsecutiveMacros: true
+AlignEscapedNewlines: Left
+AlignOperands: false
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowShortFunctionsOnASingleLine: Inline
+AlwaysBreakBeforeMultilineStrings: false
+AlwaysBreakTemplateDeclarations: true
+BinPackArguments: true
+BinPackParameters: true
+BraceWrapping:
+  AfterFunction: true
+  SplitEmptyRecord: false
+BreakBeforeBinaryOperators: false
+BreakBeforeBraces: Custom
+BreakConstructorInitializers: BeforeComma
+Cpp11BracedListStyle: false
+IndentCaseLabels: true
+IndentWidth: 4
+PenaltyBreakBeforeFirstCallParameter: 300
+PenaltyReturnTypeOnItsOwnLine: 600
+SpaceAfterCStyleCast: true
+SpaceBeforeCpp11BracedList: true
+TabWidth: 4
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex:           '^<async/'
+    Priority:        2
+  - Regex:           '^<asynchttp/'
+    Priority:        2
+  - Regex:           '^<asynctls/'
+    Priority:        2
+  - Regex:           '^<encjson\.h>'
+    Priority:        2
+  - Regex:           '^<fsdyn/'
+    Priority:        2
+  - Regex:           '^<fstrace\.h>'
+    Priority:        2
+  - Regex:           '^<nwutil\.h>'
+    Priority:        2
+  - Regex:           '^<rotatable/'
+    Priority:        2
+  - Regex:           '^<unixkit/'
+    Priority:        2
+  - Regex:           '^<'
+    Priority:        1
+  - Regex:           '.*'
+    Priority:        3
