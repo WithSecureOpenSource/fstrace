@@ -1,18 +1,20 @@
-#include <stdio.h>
-#include <unistd.h>
+#include "fstracetest.h"
+
+#include <assert.h>
 #include <stdarg.h>
 #include <stdbool.h>
-#include <time.h>
-#include <string.h>
 #include <stdint.h>
-#include <assert.h>
-#include <sys/time.h>
+#include <stdio.h>
+#include <string.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/wait.h>
+#include <time.h>
+#include <unistd.h>
+
 #include <fsdyn/charstr.h>
 #include <fsdyn/fsalloc.h>
 #include <fstrace.h>
-#include "fstracetest.h"
 
 static int failures = 0;
 
@@ -39,7 +41,7 @@ void tlog(const char *format, ...)
 }
 
 static int outstanding_object_count = 0;
-static bool log_allocation = false;  /* set in debugger */
+static bool log_allocation = false; /* set in debugger */
 
 static fs_realloc_t reallocator;
 
@@ -176,8 +178,7 @@ VERDICT test_fstrace_robustness(void)
 {
     fstrace_t *trace = fstrace_open(prefix, 1000000);
     fstrace_limit_rotation_byte_count(trace, 2500000);
-    fstrace_event_t *TEST_ROBUST =
-        fstrace_declare(trace, "TEST-ROBUST", "%s");
+    fstrace_event_t *TEST_ROBUST = fstrace_declare(trace, "TEST-ROBUST", "%s");
     fstrace_select_safe(trace, enable_all, NULL);
     pid_t child_pid = fork();
     assert(child_pid >= 0);
