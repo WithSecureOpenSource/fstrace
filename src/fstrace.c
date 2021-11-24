@@ -994,12 +994,12 @@ static bool parse_format(list_t *fields, const char *format,
 fstrace_event_t *fstrace_declare(fstrace_t *trace, const char *id,
                                  const char *format)
 {
+    if (!lock(trace))
+        return NULL;
     struct fstrace_event_impl *ev_imp = fsalloc(sizeof *ev_imp);
     ev_imp->trace = trace;
     ev_imp->id = strdup(id);
     ev_imp->fields = make_list();
-    if (!lock(trace))
-        return NULL;
     fstrace_event_t *event = shared_alloc(trace, sizeof *event);
     event->impl = ev_imp; /* redundant */
     event->enabled = 0;
