@@ -7,12 +7,13 @@ lib = env.Install('lib', ['../../src/libfstrace.a'])
 env.Command('etc/fstracecheck.py', [], 'ln -sf ../bin/fstracecheck $TARGET')
 fstracecheck = env.Install('bin', ['#bin/fstracecheck','#bin/fstracecheck2'])
 
-env.Alias(
-    'install', env.Install(os.path.join(env['PREFIX'], 'include'), include),
-)
-env.Alias('install', env.Install(os.path.join(env['PREFIX'], 'lib'), lib))
-env.Alias(
-    'install', env.Install(os.path.join(env['PREFIX'], 'bin'), fstracecheck)
-)
+if env["HOST_ARCH"] == env["ARCH"]:
+    env.Alias(
+        'install', env.Install(os.path.join(env['PREFIX'], 'include'), include),
+    )
+    env.Alias('install', env.Install(os.path.join(env['PREFIX'], 'lib'), lib))
+    env.Alias(
+        'install', env.Install(os.path.join(env['PREFIX'], 'bin'), fstracecheck)
+    )
 
-env['CONFIG_BUILDER'](env)
+env.FSEnvInstallCommonLibConfig()
