@@ -10,13 +10,23 @@ the following libraries:
 - [fsdyn][]
 - [rotatable][]
 
+Before building fsdyn for the first time, run
+```
+git submodule update --init
+```
+
 To build fstrace, run
 ```
-scons prefix=<prefix> install
+scons [ prefix=<prefix> ]
 ```
 from the top-level fstrace directory. The prefix argument is a directory,
 `/usr/local` by default, where the build system searches for `fstrace`
-dependencies and installs `fstrace`.
+dependencies and installs fstrace.
+
+To install fstrace, run
+```
+sudo scons [ prefix=<prefix> ] install
+```
 
 ## Trace File Format
 
