@@ -162,8 +162,6 @@ static fstrace_t *do_open(const char *pathname_prefix, ssize_t rotate_size,
     trace->pathname_prefix = strdup(pathname_prefix);
     trace->rotate_size = rotate_size;
     trace->events = make_list();
-    trace->shared_ordinal = shared_alloc(trace, sizeof *trace->shared_ordinal);
-    trace->ordinal = *trace->shared_ordinal = 0;
     trace->params = shared_alloc(trace, sizeof *trace->params);
     trace->params->uid = THE_USER_ID;
     trace->params->gid = THE_GROUP_ID;
@@ -176,13 +174,12 @@ static fstrace_t *do_open(const char *pathname_prefix, ssize_t rotate_size,
     } else {
         trace->rotatable =
             make_rotatable(pathname_prefix, ".log", rotate_size, trace->params);
-        rotatable_set_mode(trace->rotatable, 0600);
-        struct timeval tv;
-        gettimeofday(&tv, NULL);
-        time_t t = tv.tv_sec;
-        struct tm tm;
-        epoch_to_utc(t, &tm);
-        (void) rotatable_rename(trace->rotatable, &tm, tv.tv_usec);
+        trace->shared_ordinal =
+            shared_alloc(trace, sizeof *trace->shared_ordinal);
+        /* 0 for uninitialized; see emit_timestamp(), where the
+         * rotatable is initialized. That is done so trace->params can
+         * be taken into account in the initial rotation. */
+        *trace->shared_ordinal = 0;
     }
     trace->common_fields = NULL;
     return trace;
@@ -1053,9 +1050,15 @@ static bool emit_timestamp(fstrace_t *trace)
     struct tm tm;
     epoch_to_utc(t, &tm);
     if (trace->rotatable) {
-        bool in_sync = trace->ordinal == *trace->shared_ordinal;
+        unsigned shared_ordinal = *trace->shared_ordinal;
+        if (!shared_ordinal) {
+            /* initialize rotatable */
+            trace->ordinal = *trace->shared_ordinal = shared_ordinal = 1;
+            rotatable_set_mode(trace->rotatable, 0600);
+            (void) rotatable_rename(trace->rotatable, &tm, tv.tv_usec);
+        }
         switch (rotatable_rotate_maybe(trace->rotatable, &tm, tv.tv_usec,
-                                       !in_sync)) {
+                                       trace->ordinal != shared_ordinal)) {
             case ROTATION_OK:
                 trace->ordinal = *trace->shared_ordinal;
                 break;
