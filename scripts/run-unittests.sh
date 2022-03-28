@@ -54,7 +54,11 @@ run-tests () {
         stage/$arch/build/test/fstracetest stage/$arch/workdir
         return
     fi
-    rm -rf stage/$arch/test/gcov &&
+    # The generated .gcda and .gcno files are not rewritten on
+    # rebuild, which leads to errors and/or bad stats. I don't know a
+    # better way around the problem but to get rid of the whole target
+    # directory each time:
+    rm -rf stage/$arch/test &&
     mkdir -p stage/$arch/test/gcov &&
     if ! FSCCFLAGS="-fprofile-arcs -ftest-coverage -O0" \
          FSLINKFLAGS="-fprofile-arcs" \
