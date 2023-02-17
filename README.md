@@ -55,6 +55,9 @@ Format directive|Output format Regex|Explanation
 %64d|`-?[0-9]+`|signed integer
 %64u|`[0-9]+`|unsigned integer
 %64x|`[0-9a-f]+`|unsigned hexadecimal
+%lld|`-?[0-9]+`|signed integer
+%llu|`[0-9]+`|unsigned integer
+%llx|`[0-9a-f]+`|unsigned hexadecimal
 %z|`-?[0-9]+`|signed integer
 %f|`-?[0-9]+(\.[0-9]+)?(e[-+][0-9]+)+`|floating-point
 %b|`true\|false`|boolean
