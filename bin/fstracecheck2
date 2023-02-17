@@ -32,6 +32,9 @@ DESCR_PTN = re.compile(
             "%64d",
             "%64u",
             "%64x",
+            "%lld",
+            "%llu",
+            "%llx",
             "%z",
             "%f",
             "%s",
@@ -104,6 +107,12 @@ FSTRACECHECK %64u
  PRIu64
 FSTRACECHECK %64x
  PRIx64
+FSTRACECHECK %lld
+ "lld"
+FSTRACECHECK %llu
+ "llu"
+FSTRACECHECK llx
+ "llx"
 FSTRACECHECK %f
  "f"
 FSTRACECHECK %s

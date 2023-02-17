@@ -320,6 +320,21 @@ static void process_hex64(fstrace_t *trace, va_list *pap)
     fprintf(trace->outf, "%llx", (unsigned long long) va_arg(*pap, uint64_t));
 }
 
+static void process_ll_signed64(fstrace_t *trace, va_list *pap)
+{
+    fprintf(trace->outf, "%lld", va_arg(*pap, long long));
+}
+
+static void process_ll_unsigned64(fstrace_t *trace, va_list *pap)
+{
+    fprintf(trace->outf, "%llu", va_arg(*pap, unsigned long long));
+}
+
+static void process_ll_hex64(fstrace_t *trace, va_list *pap)
+{
+    fprintf(trace->outf, "%llx", va_arg(*pap, unsigned long long));
+}
+
 static void process_ssize_t(fstrace_t *trace, va_list *pap)
 {
     fprintf(trace->outf, "%lld", (long long) va_arg(*pap, ssize_t));
@@ -912,6 +927,9 @@ static struct field_descr {
     { "%64d", process_signed64 },
     { "%64u", process_unsigned64 },
     { "%64x", process_hex64 },
+    { "%lld", process_ll_signed64 },
+    { "%llu", process_ll_unsigned64 },
+    { "%llx", process_ll_hex64 },
     { "%z", process_ssize_t },
     { "%f", process_float },
     { "%b", process_bool },

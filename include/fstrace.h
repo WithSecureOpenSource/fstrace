@@ -65,6 +65,9 @@ int fstrace_close(fstrace_t *trace);
  * %64d  An int64_t argument.
  * %64u  An uint64_t argument.
  * %64x  An uint64_t argument.
+ * %lld  A long long argument.
+ * %llu  A long long unsigned argument.
+ * %llx  A long long unsigned argument.
  * %z    An ssize_t (or size_t) argument.
  * %f    A double argument.
  * %b    A boolean (or int) argument.
