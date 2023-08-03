@@ -843,7 +843,7 @@ static void emit_ipv6_address(FILE *outf, const struct sockaddr_in6 *addr,
     const uint16_t *end = begin + 8;
     const uint16_t *best_zero = NULL;
     size_t best_seq = 0;
-    const uint16_t *p = begin;
+    const uint16_t *p;
     for (p = begin; p < end; p++) {
         const uint16_t *q = p;
         for (; p < end && !*p; p++)
