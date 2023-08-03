@@ -36,14 +36,17 @@ def construct():
             CCFLAGS=TARGET_FLAGS[target_arch] + ccflags,
             CPPDEFINES=TARGET_DEFINES[target_arch],
             LINKFLAGS=TARGET_FLAGS[target_arch],
-            tools=['default', 'textfile', 'fscomp'])
+            tools=['default', 'textfile', 'fscomp', 'scons_compilation_db'])
         fsenv.consider_environment_variables(arch_env)
         build_dir = os.path.join(
             fsenv.STAGE,
             target_arch,
             ARGUMENTS.get('builddir', 'build'))
+        arch_env.CompilationDB(
+            os.path.join(build_dir, "compile_commands.json"))
         for directory in DIRECTORIES:
             env = arch_env.Clone()
+            env.SetCompilationDB(arch_env.GetCompilationDB())
             SConscript(dirs=directory,
                        exports=['env'],
                        duplicate=False,
