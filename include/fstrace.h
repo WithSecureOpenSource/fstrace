@@ -409,7 +409,7 @@ struct TraceIterator {
             value = static_cast<const std::string &>(*tracer->current_).c_str();
         } else if constexpr (std::is_same<value_type, uint64_t>::value) {
             value = fstrace_unsigned_repr(
-                static_cast<std::uint64_t>(*tracer->current_));
+                static_cast<uint64_t>(*tracer->current_));
         } else {
             static_assert(always_false<TContainer>::value, "Unsupported type");
         }
