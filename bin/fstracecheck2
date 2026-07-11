@@ -166,6 +166,7 @@ def form_tstcmd(argv, dirpath, pathname, test_source):
             arch = False
         elif arg == "-c":
             yield "-E"
+            yield "-P"
         elif arg == "-o":
             obj = True
             yield arg
@@ -236,6 +237,7 @@ def form_ppcmd(argv, dirpath, pathname, x_output):
             arch = False
         elif arg == "-c":
             yield "-E"
+            yield "-P"
         elif arg == "-o":
             obj = True
             yield arg
@@ -335,6 +337,8 @@ def form_cccmd(argv, dirpath, pathname, pp_output):
         else:
             yield arg
     yield "-Wno-unused-command-line-argument"
+    yield "-Wformat"
+    yield "-Werror"
     yield "-O0"  # quicker
 
 
